@@ -18,6 +18,13 @@ lives in a local SQLite file. Object data stays in R2.
 - Go 1.26+, Node 22+ (build only)
 - An R2 API token (Object Read & Write) scoped to the buckets you want to share
 
+## Download
+
+Prebuilt binaries (Linux, macOS, Windows; amd64/arm64) with the web UI
+embedded are attached to each [GitHub release](../../releases). Extract and
+run `./ku-storage` — no other files or runtimes are needed.
+`./ku-storage --version` prints the version.
+
 ## Quick start
 
     make build
@@ -99,6 +106,10 @@ day" so interrupted large uploads do not leave billable parts behind.
 
 `go test -tags integration ./internal/s3x/` also runs against a real R2
 bucket — see the header of `internal/s3x/s3x_integration_test.go`.
+
+Releasing: push a tag (`git tag v1.2.3 && git push origin v1.2.3`). The
+`release` workflow builds the SPA, runs the tests, cross-compiles all
+platforms with `scripts/build-release.sh` and publishes the GitHub release.
 
 Design: `docs/superpowers/specs/2026-11-19-ku-storage-v1-design.md`,
 API contract: `docs/api.md`.

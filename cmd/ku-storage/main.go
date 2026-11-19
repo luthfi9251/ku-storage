@@ -37,7 +37,14 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// version is set at build time: -ldflags "-X main.version=v1.0.0".
+var version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v" || os.Args[1] == "version") {
+		fmt.Println("ku-storage", version)
+		return
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
@@ -96,7 +103,7 @@ func main() {
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 	}()
-	log.Printf("ku-storage listening on %s (db %s)", cfg.Addr, cfg.DBPath)
+	log.Printf("ku-storage %s listening on %s (db %s)", version, cfg.Addr, cfg.DBPath)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
