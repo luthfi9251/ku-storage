@@ -58,7 +58,7 @@ export default function Preview({ bucketId, obj, onClose }: { bucketId: string; 
         <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2.5 rounded-xl border border-gray-200 p-4 text-xs dark:border-zinc-800">
           <dt className="text-gray-500 dark:text-zinc-500">Size</dt>
           <dd className="text-gray-800 dark:text-zinc-200">
-            {fmtSize(obj.size)} <span className="text-gray-500 dark:text-zinc-500">({obj.size.toLocaleString()} bytes)</span>
+            {fmtSize(obj.size)} <span className="text-gray-500 dark:text-zinc-500">({obj.size.toLocaleString('en-US')} bytes)</span>
           </dd>
           <dt className="text-gray-500 dark:text-zinc-500">Last modified</dt>
           <dd className="text-gray-800 dark:text-zinc-200">{fmtDate(obj.lastModified)}</dd>

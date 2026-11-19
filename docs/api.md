@@ -1,20 +1,20 @@
 # ku-storage HTTP API (v1)
 
-Kontrak antara backend Go dan SPA. Semua body JSON memakai camelCase.
-ID selalu string opaque. Timestamp: string RFC3339 (UTC). Field nullable
-ditulis `T | null`.
+Contract between the Go backend and the SPA. All JSON bodies use camelCase.
+IDs are always opaque strings. Timestamps: RFC3339 strings (UTC). Nullable
+fields are written `T | null`.
 
-## Konvensi
+## Conventions
 
-- Error: status HTTP non-2xx + `{ "error": "CODE", "message": "..." }`.
+- Errors: non-2xx HTTP status + `{ "error": "CODE", "message": "..." }`.
 - Auth: cookie `ku_storage_session` (HttpOnly). `401 UNAUTHENTICATED` →
-  SPA redirect ke `/login`.
-- CSRF: semua method selain GET/HEAD harus mengirim header `Origin` yang
-  sama dengan origin aplikasi (browser melakukannya otomatis untuk
-  `fetch`). Gagal → `403 BAD_ORIGIN`.
-- `/api/admin/*` hanya untuk role `admin` → selain itu `403 FORBIDDEN`.
+  the SPA redirects to `/login`.
+- CSRF: every method other than GET/HEAD must send an `Origin` header equal
+  to the application origin (browsers do this automatically for `fetch`).
+  Otherwise → `403 BAD_ORIGIN`.
+- `/api/admin/*` is for the `admin` role only → otherwise `403 FORBIDDEN`.
 
-### Tipe bersama
+### Shared types
 
 ```ts
 type Perms = { read: boolean; create: boolean; update: boolean; delete: boolean }
@@ -24,15 +24,15 @@ type MeUser = { id: string; username: string; displayName: string; role: Role }
 
 type EntryPoint = {
   bucketId: string
-  bucketName: string       // nama bucket di R2
-  displayName: string      // nama tampilan bucket (fallback ke bucketName)
+  bucketName: string       // bucket name in R2
+  displayName: string      // bucket display name (falls back to bucketName)
   connectionName: string
-  prefix: string           // '' = seluruh bucket, selain itu diakhiri '/'
+  prefix: string           // '' = whole bucket, otherwise ends with '/'
   perms: Perms
 }
 ```
 
-Error codes yang dipakai: `UNAUTHENTICATED`, `FORBIDDEN`, `BAD_ORIGIN`,
+Error codes in use: `UNAUTHENTICATED`, `FORBIDDEN`, `BAD_ORIGIN`,
 `INVALID_BODY`, `INVALID_INPUT`, `INVALID_KEY`, `NOT_FOUND`,
 `RATE_LIMITED`, `INVALID_CREDENTIALS`, `ALREADY_SETUP`, `CONFLICT`,
 `OBJECT_EXISTS`, `OBJECT_MISSING`, `FOLDER_TOO_LARGE`, `TOO_LARGE`,
@@ -48,9 +48,9 @@ Error codes yang dipakai: `UNAUTHENTICATED`, `FORBIDDEN`, `BAD_ORIGIN`,
 | POST | `/api/auth/login` | `{ username, password }` | `{ user: MeUser }` (+ cookie). `401 INVALID_CREDENTIALS`, `429 RATE_LIMITED` |
 | POST | `/api/auth/logout` | – | `204` |
 | GET | `/api/invites/{token}` | – | `{ username, displayName, purpose: 'invite' \| 'reset' }`. `404 INVITE_INVALID` |
-| POST | `/api/invites/{token}` | `{ password }` | `{ user: MeUser }` (+ cookie, langsung login) |
+| POST | `/api/invites/{token}` | `{ password }` | `{ user: MeUser }` (+ cookie, logged in right away) |
 | GET | `/api/me` | – | `{ user: MeUser, access: EntryPoint[] }` |
-| PUT | `/api/me/password` | `{ currentPassword, newPassword }` | `204` (session lain diputus) |
+| PUT | `/api/me/password` | `{ currentPassword, newPassword }` | `204` (other sessions are ended) |
 | GET | `/api/me/sessions` | – | `Session[]` |
 | DELETE | `/api/me/sessions/{id}` | – | `204` |
 | POST | `/api/me/sessions/revoke-others` | – | `204` |
@@ -59,15 +59,15 @@ Error codes yang dipakai: `UNAUTHENTICATED`, `FORBIDDEN`, `BAD_ORIGIN`,
 type Session = { id: string; ip: string; userAgent: string; createdAt: string; lastSeenAt: string; current: boolean }
 ```
 
-Password minimal 10 karakter (`400 INVALID_INPUT`). Username: 3–64
-karakter `[a-z0-9._-]`, case-insensitive (disimpan lowercase).
+Passwords need at least 10 characters (`400 INVALID_INPUT`). Usernames: 3–64
+characters of `[a-z0-9._-]`, case-insensitive (stored lowercase).
 
-Admin melihat `access` berisi semua bucket terdaftar dengan prefix `''`
-dan semua perms `true`.
+For admins, `access` lists every registered bucket with prefix `''` and
+all perms `true`.
 
-## Object (dicek authz)
+## Objects (authz-checked)
 
-`bucket` = bucket **id** (bukan nama).
+`bucket` = bucket **id** (not the name).
 
 ### `GET /api/browse?bucket=&prefix=&cursor=`
 
@@ -75,17 +75,17 @@ dan semua perms `true`.
 type BrowseResult = {
   bucket: { id: string; name: string; displayName: string }
   prefix: string
-  virtual: boolean          // true = folder sintetis menuju grant, tanpa isi R2
-  perms: Perms              // izin efektif pada prefix ini
+  virtual: boolean          // true = synthetic folders leading to a grant, no R2 content
+  perms: Perms              // effective permissions at this prefix
   folders: { name: string; prefix: string; perms: Perms }[]
   objects: { key: string; name: string; size: number; lastModified: string; etag: string }[]
-  nextCursor: string | null // kirim balik sebagai ?cursor= untuk halaman berikut
+  nextCursor: string | null // send back as ?cursor= for the next page
 }
 ```
 
-Maks 1000 entri (folder + object) per halaman. Object penanda folder
-(key == prefix) tidak ikut di `objects`. `403 FORBIDDEN` bila prefix
-tidak bisa dilihat.
+At most 1000 entries (folders + objects) per page. The folder marker object
+(key == prefix) is not included in `objects`. `403 FORBIDDEN` when the prefix
+is not visible.
 
 ### `GET /api/objects/stat?bucket=&key=`
 
@@ -93,32 +93,32 @@ tidak bisa dilihat.
 
 ### `GET /api/objects/download?bucket=&key=&inline=0|1`
 
-`302` ke presigned URL R2 (berlaku 5 menit). `inline=1` untuk preview
-(Content-Disposition inline), default attachment. Dipakai langsung sebagai
+`302` to a presigned R2 URL (valid for 5 minutes). `inline=1` for preview
+(Content-Disposition inline), attachment by default. Used directly as
 `href` / `src`.
 
 ### `PUT /api/objects?bucket=&key=&overwrite=0|1`
 
-Body = isi file mentah. Wajib `Content-Length` (browser otomatis untuk
-`File`/`Blob`). `Content-Type` dari header request.
+Body = raw file content. `Content-Length` is required (browsers set it for
+`File`/`Blob`). `Content-Type` comes from the request header.
 
 - `201 { key, size, etag }`
-- `409 OBJECT_EXISTS` — object sudah ada dan `overwrite=0`
-- `409 OBJECT_MISSING` — `overwrite=1`, user tidak punya `create`, key belum ada
-- `409 CONFLICT` — object berubah saat sedang ditimpa (coba lagi)
-- `403 FORBIDDEN` — tidak punya `create` (overwrite=0) / `update` (overwrite=1)
+- `409 OBJECT_EXISTS` — the object exists and `overwrite=0`
+- `409 OBJECT_MISSING` — `overwrite=1`, the user lacks `create` and the key does not exist
+- `409 CONFLICT` — the object changed while being overwritten (try again)
+- `403 FORBIDDEN` — missing `create` (overwrite=0) / `update` (overwrite=1)
 - `413 TOO_LARGE`, `411 LENGTH_REQUIRED`, `400 INVALID_KEY`
 
 ### `POST /api/folders`
 
-`{ bucket, prefix, name }` → `201 { prefix }` (prefix folder baru, diakhiri
-`/`). `409 OBJECT_EXISTS` bila sudah ada.
+`{ bucket, prefix, name }` → `201 { prefix }` (prefix of the new folder, ending
+with `/`). `409 OBJECT_EXISTS` if it already exists.
 
 ### `POST /api/objects/delete`
 
-`{ bucket, keys: string[] }` (maks 1000). Key berakhiran `/` = folder,
-dihapus rekursif (maks 10.000 object per folder → `422 FOLDER_TOO_LARGE`,
-dicek sebelum menghapus apa pun).
+`{ bucket, keys: string[] }` (max 1000). A key ending with `/` is a folder,
+deleted recursively (max 10,000 objects per folder → `422 FOLDER_TOO_LARGE`,
+checked before anything is deleted).
 
 → `{ deleted: number, errors: { key: string; message: string }[] }`
 
@@ -128,11 +128,11 @@ dicek sebelum menghapus apa pun).
 type GroupRef = { id: string; name: string }
 type User = {
   id: string; username: string; displayName: string; role: Role
-  disabled: boolean; pending: boolean          // pending = belum set password
+  disabled: boolean; pending: boolean          // pending = no password set yet
   createdAt: string; lastLoginAt: string | null
   groups: GroupRef[]
 }
-type InviteLink = { invitePath: string; expiresAt: string }  // SPA menambah window.location.origin
+type InviteLink = { invitePath: string; expiresAt: string }  // the SPA prepends window.location.origin
 
 type Group = { id: string; name: string; createdAt: string; members: { id: string; username: string; displayName: string }[] }
 
@@ -166,37 +166,37 @@ type AuditEntry = {
 | GET | `/api/admin/users` | – | `User[]` |
 | POST | `/api/admin/users` | `{ username, displayName, role, groupIds: string[] }` | `201 { user: User, invite: InviteLink }` |
 | PUT | `/api/admin/users/{id}` | `{ displayName, role, disabled, groupIds }` | `User`. `409 LAST_ADMIN` |
-| POST | `/api/admin/users/{id}/reset` | – | `InviteLink` (session user diputus) |
+| POST | `/api/admin/users/{id}/reset` | – | `InviteLink` (the user's sessions are ended) |
 | DELETE | `/api/admin/users/{id}` | – | `204`. `409 LAST_ADMIN` |
 | GET | `/api/admin/users/{id}/access` | – | `{ grants: (Grant & { via: 'user' \| 'group' })[], access: EntryPoint[] }` |
 | GET | `/api/admin/groups` | – | `Group[]` |
 | POST | `/api/admin/groups` | `{ name, memberIds: string[] }` | `201 Group` |
 | PUT | `/api/admin/groups/{id}` | `{ name, memberIds }` | `Group` |
-| DELETE | `/api/admin/groups/{id}` | – | `204` (grant grup ikut terhapus) |
+| DELETE | `/api/admin/groups/{id}` | – | `204` (the group's grants are removed too) |
 | GET | `/api/admin/connections` | – | `Connection[]` |
 | POST | `/api/admin/connections` | `{ name, kind, accountId, endpoint, region, pathStyle, accessKey, secretKey }` | `201 Connection` |
-| PUT | `/api/admin/connections/{id}` | sama; `secretKey: ''` = tidak diubah | `Connection` |
-| DELETE | `/api/admin/connections/{id}` | – | `204`. `409 CONFLICT` bila masih punya bucket |
-| POST | `/api/admin/connections/{id}/discover` | – | `{ buckets: string[] }` atau `502 STORAGE_ERROR` |
+| PUT | `/api/admin/connections/{id}` | same; `secretKey: ''` = unchanged | `Connection` |
+| DELETE | `/api/admin/connections/{id}` | – | `204`. `409 CONFLICT` while it still has buckets |
+| POST | `/api/admin/connections/{id}/discover` | – | `{ buckets: string[] }` or `502 STORAGE_ERROR` |
 | GET | `/api/admin/buckets` | – | `Bucket[]` |
 | POST | `/api/admin/buckets` | `{ connectionId, name, displayName }` | `201 Bucket` |
 | PUT | `/api/admin/buckets/{id}` | `{ displayName }` | `Bucket` |
-| DELETE | `/api/admin/buckets/{id}` | `{ confirmName }` (= nama bucket) | `204`. `400 CONFIRM_MISMATCH` |
+| DELETE | `/api/admin/buckets/{id}` | `{ confirmName }` (= bucket name) | `204`. `400 CONFIRM_MISMATCH` |
 | POST | `/api/admin/buckets/{id}/test` | `{ write: boolean }` | `{ ok: boolean, steps: { name: string; ok: boolean; message: string }[] }` |
 | GET | `/api/admin/grants?bucket=&subjectType=&subjectId=` | – | `Grant[]` |
-| POST | `/api/admin/grants` | `{ subjectType, subjectId, bucketId, prefix, perms }` | `201 Grant` (upsert pada subject+bucket+prefix) |
+| POST | `/api/admin/grants` | `{ subjectType, subjectId, bucketId, prefix, perms }` | `201 Grant` (upsert on subject+bucket+prefix) |
 | PUT | `/api/admin/grants/{id}` | `{ prefix, perms }` | `Grant` |
 | DELETE | `/api/admin/grants/{id}` | – | `204` |
 | GET | `/api/admin/audit?user=&bucket=&action=&result=&from=&to=&before=&limit=` | – | `{ items: AuditEntry[], nextBefore: string \| null }` |
-| GET | `/api/admin/audit.csv?...` | filter sama | `text/csv` (attachment) |
+| GET | `/api/admin/audit.csv?...` | same filters | `text/csv` (attachment) |
 
-Untuk kolom `kind: 'r2'` cukup `accountId`; `endpoint`/`region`/`pathStyle`
-diabaikan (region otomatis `auto`). Untuk `kind: 's3'` wajib `endpoint`
-(`https://...` atau `http://...`).
+For `kind: 'r2'`, `accountId` is enough; `endpoint`/`region`/`pathStyle`
+are ignored (region is always `auto`). For `kind: 's3'`, `endpoint` is
+required (`https://...` or `http://...`).
 
-Grant: `perms.read` wajib `true` bila perms lain ada yang `true`
-(`400 INVALID_INPUT`). `prefix` dinormalisasi server (ditambah `/`).
+Grants: `perms.read` must be `true` when any other perm is `true`
+(`400 INVALID_INPUT`). The server normalises `prefix` (appends `/`).
 
-`audit` `from`/`to` = RFC3339 atau `YYYY-MM-DD`; `before` = id entri
-terakhir halaman sebelumnya (paging mundur, terbaru dulu); `limit`
-default 100, maks 500.
+`audit` `from`/`to` = RFC3339 or `YYYY-MM-DD` (`to` is inclusive for dates);
+`before` = id of the last entry of the previous page (pages go backwards,
+newest first); `limit` defaults to 100, max 500.

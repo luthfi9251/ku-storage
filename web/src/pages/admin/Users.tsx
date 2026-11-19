@@ -45,6 +45,7 @@ export default function Users() {
   const [inviting, setInviting] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [deleting, setDeleting] = useState<User | null>(null)
+  const [resetting, setResetting] = useState<User | null>(null)
   const [accessOf, setAccessOf] = useState<User | null>(null)
   const [link, setLink] = useState<{ title: string; user: User; invite: InviteLink } | null>(null)
 
@@ -53,7 +54,8 @@ export default function Users() {
   const reset = useMutation({
     mutationFn: (u: User) => api.post<InviteLink>(`/api/admin/users/${encodeURIComponent(u.id)}/reset`),
     onSuccess: (invite, u) => {
-      setLink({ title: 'Password reset link', user: u, invite })
+      setResetting(null)
+      setLink({ title: u.pending ? 'Invite link' : 'Password reset link', user: u, invite })
       invalidate()
     },
     onError: (e) => toast.error(errMsg(e)),
@@ -134,16 +136,8 @@ export default function Users() {
                       variant="ghost"
                       title={u.pending ? 'New invite link' : 'Reset password'}
                       disabled={reset.isPending}
-                      onClick={() => {
-                        if (
-                          confirm(
-                            u.pending
-                              ? `Create a new invite link for "${u.username}"? The previous link stops working.`
-                              : `Reset the password of "${u.username}"? They will be signed out and need the new link to log in.`,
-                          )
-                        )
-                          reset.mutate(u)
-                      }}
+                      aria-label={u.pending ? 'New invite link' : 'Reset password'}
+                      onClick={() => setResetting(u)}
                     >
                       <KeyRound size={14} />
                     </Button>
@@ -184,6 +178,20 @@ export default function Users() {
         />
       )}
       {link && <LinkModal {...link} onClose={() => setLink(null)} />}
+      <ConfirmDialog
+        open={!!resetting}
+        title={resetting?.pending ? 'New invite link' : 'Reset password'}
+        message={
+          resetting?.pending
+            ? `Create a new invite link for "${resetting?.username}"? The previous link stops working.`
+            : `Reset the password of "${resetting?.username}"? They will be signed out and need the new link to log in.`
+        }
+        confirmLabel={resetting?.pending ? 'Create link' : 'Reset password'}
+        danger={!resetting?.pending}
+        busy={reset.isPending}
+        onConfirm={() => resetting && reset.mutate(resetting)}
+        onClose={() => setResetting(null)}
+      />
       <ConfirmDialog
         open={!!deleting}
         title="Delete user"

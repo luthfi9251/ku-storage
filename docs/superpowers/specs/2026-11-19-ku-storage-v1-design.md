@@ -3,47 +3,47 @@
 Date: 2026-11-19
 Status: Implemented (v1)
 
-## Ringkasan
+## Summary
 
-ku-storage adalah **access broker** untuk object storage Cloudflare R2
-(dan S3-compatible lain). Admin mendaftarkan kredensial R2 sekali di
-server; user lain login ke ku-storage dan hanya bisa melihat / membuat /
-mengubah / menghapus object pada bucket & folder (prefix) yang di-grant
-kepadanya. Kredensial R2 tidak pernah keluar dari server, dan setiap aksi
-tercatat atas nama user di audit log.
+ku-storage is an **access broker** for Cloudflare R2 object storage
+(and other S3-compatible storage). The admin registers R2 credentials once on
+the server; other users log in to ku-storage and can only view / create /
+modify / delete objects in the buckets & folders (prefixes) granted
+to them. R2 credentials never leave the server, and every action
+is recorded under the user's name in the audit log.
 
-Pain point yang diselesaikan: token R2 hanya bisa dibatasi per bucket,
-tidak bisa per folder, tidak membedakan upload vs hapus, dan tidak punya
-jejak per orang. Memberi akses ke orang lain berarti membagikan token.
+Pain point being solved: R2 tokens can only be scoped per bucket,
+not per folder, don't distinguish upload vs delete, and leave no
+per-person trail. Giving someone else access means sharing the token.
 
-Stack mengikuti ku-dump / ku-crud: Go (single binary, `net/http`
-ServeMux) + React SPA di-embed via `embed.FS`, metadata di SQLite
-(`modernc.org/sqlite`, tanpa CGO), klien S3 `minio-go/v7`.
+The stack follows ku-dump / ku-crud: Go (single binary, `net/http`
+ServeMux) + React SPA embedded via `embed.FS`, metadata in SQLite
+(`modernc.org/sqlite`, no CGO), S3 client `minio-go/v7`.
 
 ## Goals (v1)
 
-1. Admin mendaftarkan koneksi R2 (account ID + access key) dan bucket
-   yang boleh dikelola melalui ku-storage
-2. Admin mengelola user (undang, nonaktifkan, reset password) dan grup
-3. Admin memberi **grant**: user/grup × bucket × prefix × izin
+1. Admin registers R2 connections (account ID + access key) and the buckets
+   that may be managed through ku-storage
+2. Admin manages users (invite, disable, reset password) and groups
+3. Admin issues **grants**: user/group × bucket × prefix × permissions
    (`read`, `create`, `update`, `delete`)
-4. User menjelajah, upload, menimpa, membuat folder, mengunduh, preview,
-   dan menghapus object — dibatasi ketat oleh grant, dicek di server
-5. Audit log semua aksi (termasuk yang ditolak), bisa difilter admin
-6. Pencabutan akses / nonaktif user berlaku seketika
+4. Users browse, upload, overwrite, create folders, download, preview,
+   and delete objects — strictly limited by grants, checked on the server
+5. Audit log of all actions (including denied ones), filterable by admins
+6. Revoking access / disabling a user takes effect immediately
 
 ## Non-goals (v1)
 
-- **Membuat / menghapus / mengonfigurasi bucket** — dilakukan di
-  dashboard Cloudflare (keputusan produk, bukan sekadar ditunda)
-- Share link / presigned URL untuk pihak di luar ku-storage (v2)
-- Rename / move / copy object, operasi rekursif besar sebagai job (v2)
-- Edit metadata object, download folder sebagai ZIP (v2)
-- SSO/OIDC, 2FA, kuota upload, delegasi grant oleh non-admin (v3)
-- Versioning, ACL, bucket policy, object tagging (tidak didukung R2)
-- Upload resumable
+- **Creating / deleting / configuring buckets** — done in the
+  Cloudflare dashboard (a product decision, not merely deferred)
+- Share links / presigned URLs for parties outside ku-storage (v2)
+- Rename / move / copy objects, large recursive operations as jobs (v2)
+- Editing object metadata, downloading a folder as ZIP (v2)
+- SSO/OIDC, 2FA, upload quotas, grant delegation by non-admins (v3)
+- Versioning, ACLs, bucket policies, object tagging (not supported by R2)
+- Resumable uploads
 
-## Arsitektur
+## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -55,7 +55,7 @@ ServeMux) + React SPA di-embed via `embed.FS`, metadata di SQLite
 │                              │               │           │
 │  ┌───────────────────────────┴──┐  ┌─────────┴────────┐  │
 │  │ SQLite: users, sessions,     │  │ s3x: client pool │  │
-│  │ groups, connections, buckets,│  │ per koneksi      │  │
+│  │ groups, connections, buckets,│  │ per connection   │  │
 │  │ grants, audit_log            │  │ (minio-go)       │  │
 │  └──────────────────────────────┘  └─────────┬────────┘  │
 └──────────────────────────────────────────────┼───────────┘
@@ -63,54 +63,54 @@ ServeMux) + React SPA di-embed via `embed.FS`, metadata di SQLite
          browser ── presigned GET (302) ──→ Cloudflare R2
 ```
 
-- **Upload** selalu lewat server (stream, tanpa file temp) — server
-  adalah titik penegakan izin; user tidak pernah memegang kredensial
-  yang bisa menulis key sembarang.
-- **Download / preview** lewat redirect 302 ke presigned GET berumur
-  pendek, diterbitkan *setelah* izin dicek. Egress R2 gratis, server tidak
-  menanggung bandwidth, Range request (video) jalan, dan konten dibuka
-  dari origin R2 sehingga HTML/SVG berbahaya tidak bisa menyentuh session
-  ku-storage.
-- **Listing** tidak di-cache di SQLite; R2 adalah sumber kebenaran.
-  (ListObjects = operasi Class A berbayar → tidak ada polling/auto-refresh.)
+- **Upload** always goes through the server (streamed, no temp file) — the server
+  is the permission enforcement point; users never hold credentials
+  that could write arbitrary keys.
+- **Download / preview** via a 302 redirect to a short-lived presigned GET,
+  issued *after* permissions are checked. R2 egress is free, the server doesn't
+  carry the bandwidth, Range requests (video) work, and content is opened
+  from the R2 origin so malicious HTML/SVG cannot touch the ku-storage
+  session.
+- **Listing** is not cached in SQLite; R2 is the source of truth.
+  (ListObjects = paid Class A operation → no polling/auto-refresh.)
 
 ### Package layout
 
-| Package | Tanggung jawab |
+| Package | Responsibility |
 |---|---|
-| `cmd/ku-storage` | entrypoint: config env, wiring, serve |
-| `internal/config` | env config (pola ku-dump) |
-| `internal/cryptx` | AES-256-GCM untuk secret koneksi (salin dari ku-dump) |
-| `internal/meta` | SQLite store + migrasi: users, sessions, invites, groups, connections, buckets, grants, audit |
-| `internal/authz` | **inti**: normalisasi & validasi key/prefix, evaluasi izin efektif, navigasi virtual. Pure function, tanpa I/O, diuji tabel |
-| `internal/s3x` | wrapper minio-go: pool client per koneksi, list, put kondisional, stat, delete batch, presign, discover bucket |
-| `internal/api` | handler HTTP, middleware session/admin/CSRF, audit hook |
+| `cmd/ku-storage` | entrypoint: env config, wiring, serve |
+| `internal/config` | env config (ku-dump pattern) |
+| `internal/cryptx` | AES-256-GCM for connection secrets (copied from ku-dump) |
+| `internal/meta` | SQLite store + migrations: users, sessions, invites, groups, connections, buckets, grants, audit |
+| `internal/authz` | **core**: key/prefix normalization & validation, effective permission evaluation, virtual navigation. Pure functions, no I/O, table-tested |
+| `internal/s3x` | minio-go wrapper: client pool per connection, list, conditional put, stat, batch delete, presign, bucket discovery |
+| `internal/api` | HTTP handlers, session/admin/CSRF middleware, audit hook |
 | `web/` | React SPA + `embed.go` |
 
-## Model akses
+## Access model
 
-### Role aplikasi
-- `admin` — mengelola koneksi, bucket, user, grup, grant; melihat audit;
-  punya seluruh izin di semua bucket terdaftar (tetap tercatat di audit).
-- `user` — hanya melihat & bertindak sesuai grant.
+### Application roles
+- `admin` — manages connections, buckets, users, groups, grants; views the audit log;
+  has all permissions on every registered bucket (still recorded in the audit log).
+- `user` — can only view & act according to grants.
 
-User pertama dibuat lewat halaman setup (pola ku-dump) dan otomatis admin.
-Minimal satu admin aktif harus selalu ada (server menolak demote/disable
-admin terakhir).
+The first user is created via the setup page (ku-dump pattern) and is automatically an admin.
+At least one active admin must always exist (the server rejects demoting/disabling
+the last admin).
 
-### Izin
+### Permissions
 
-| Izin | Operasi |
+| Permission | Operations |
 |---|---|
 | `read` | list, stat, download, preview |
-| `create` | upload ke key yang **belum ada**, buat folder |
-| `update` | menimpa object yang **sudah ada** |
-| `delete` | hapus object / folder |
+| `create` | upload to a key that **does not exist yet**, create folder |
+| `update` | overwrite an object that **already exists** |
+| `delete` | delete object / folder |
 
-Disimpan sebagai bitmask. Preset di UI: **Viewer** (read),
+Stored as a bitmask. UI presets: **Viewer** (read),
 **Contributor** (read+create), **Editor** (read+create+update),
-**Manager** (read+create+update+delete). `create`/`update`/`delete` tanpa
-`read` ditolak saat menyimpan grant (UI tidak bisa dipakai tanpa list).
+**Manager** (read+create+update+delete). `create`/`update`/`delete` without
+`read` is rejected when saving a grant (the UI is unusable without list).
 
 ### Grant
 
@@ -118,122 +118,122 @@ Disimpan sebagai bitmask. Preset di UI: **Viewer** (read),
 grant = subject (user | group) × bucket × prefix × perms
 ```
 
-- `prefix` dinormalisasi: kosong (= seluruh bucket) atau diakhiri `/`.
-  Contoh: `clients/acme/`. Ini menjamin batas folder — grant
-  `clients/acme/` **tidak** mencakup `clients/acme-evil/x`.
-- **Izin efektif** user pada `(bucket, key)` = OR dari `perms` semua grant
-  milik user tersebut + grup-grupnya di bucket itu, dengan
+- `prefix` is normalized: empty (= entire bucket) or ending with `/`.
+  Example: `clients/acme/`. This guarantees folder boundaries — the grant
+  `clients/acme/` does **not** cover `clients/acme-evil/x`.
+- A user's **effective permissions** on `(bucket, key)` = the OR of `perms` of all grants
+  belonging to that user + their groups on that bucket, where
   `strings.HasPrefix(key, grant.prefix)`.
-- Konsekuensi (monoton): izin pada key di dalam folder F selalu ⊇ izin
-  pada F. Jadi cek izin pada folder cukup untuk operasi atas seluruh isi
-  folder tersebut (dipakai oleh hapus folder).
-- Unik per `(subject, bucket, prefix)`; menyimpan ulang = update perms.
+- Consequence (monotonic): permissions on a key inside folder F are always ⊇ permissions
+  on F. So checking permissions on the folder is sufficient for operations on all
+  of that folder's contents (used by folder delete).
+- Unique per `(subject, bucket, prefix)`; saving again = updating perms.
 
-### Navigasi virtual
+### Virtual navigation
 
-User dengan grant `clients/acme/reports/` boleh "melihat jalan" dari root
-bucket tanpa melihat isi lain:
+A user with a grant on `clients/acme/reports/` may "see the path" from the bucket
+root without seeing any other contents:
 
 - `GET /api/browse?bucket=B&prefix=P`
-  - Jika P tercakup grant `read` → list ke R2 (delimiter `/`, max 1000,
-    continuation token). Setiap folder di hasil diberi `perms` efektifnya
-    (bisa lebih besar bila ada grant lebih dalam).
-  - Jika P **bukan** tercakup tetapi merupakan leluhur dari prefix grant
-    → **tanpa memanggil R2**, kembalikan folder sintetis menuju grant
-    tersebut (mis. di root: `clients/`; di `clients/`: `acme/`).
-  - Selain itu → `403 FORBIDDEN` (dan diaudit sebagai `denied`).
-- Halaman awal user ("Akses Saya") menampilkan daftar titik masuk:
-  setiap pasangan (bucket, prefix) grant yang tidak berada di dalam grant
-  lain miliknya.
+  - If P is covered by a `read` grant → list from R2 (delimiter `/`, max 1000,
+    continuation token). Each folder in the result is given its effective `perms`
+    (may be greater if there is a deeper grant).
+  - If P is **not** covered but is an ancestor of a grant prefix
+    → **without calling R2**, return synthetic folders leading to that grant
+    (e.g. at root: `clients/`; at `clients/`: `acme/`).
+  - Otherwise → `403 FORBIDDEN` (and audited as `denied`).
+- The user's home page ("My Access") shows a list of entry points:
+  every (bucket, prefix) grant pair that is not inside another
+  of their grants.
 
-### Validasi key
+### Key validation
 
-Ditolak dengan `400 INVALID_KEY` bila:
-- bukan UTF-8 valid, panjang > 1024 byte, atau kosong
-- diawali `/`, mengandung `//`, segmen `.` atau `..`
-- mengandung karakter kontrol (`< 0x20`, `0x7f`) atau `\`
+Rejected with `400 INVALID_KEY` if:
+- not valid UTF-8, length > 1024 bytes, or empty
+- starts with `/`, contains `//`, or a `.` or `..` segment
+- contains control characters (`< 0x20`, `0x7f`) or `\`
 
-Folder = object 0 byte dengan key berakhiran `/`. Nama file/folder baru
-dari UI divalidasi dengan aturan yang sama sebelum digabung dengan prefix.
+Folder = 0-byte object with a key ending in `/`. New file/folder names
+from the UI are validated with the same rules before being joined with the prefix.
 
-## Operasi object & penegakan izin
+## Object operations & permission enforcement
 
-| Operasi | Izin yang dicek | Implementasi R2 |
+| Operation | Permission checked | R2 implementation |
 |---|---|---|
-| List | `read` pada prefix | `ListObjectsV2` delimiter `/`, max 1000 |
+| List | `read` on prefix | `ListObjectsV2` delimiter `/`, max 1000 |
 | Stat | `read` | `HeadObject` |
-| Download / preview | `read` | presigned GET 5 menit, `response-content-disposition` = `attachment` (download) atau `inline` (preview), 302 |
-| Upload baru | `create` | `PutObject` + `If-None-Match: *` → 412 dipetakan ke `409 OBJECT_EXISTS` |
-| Timpa (`overwrite=1`) | `update` (+`create` jika ternyata key belum ada) | punya create+update → PUT biasa; hanya update → `HeadObject` lalu PUT dengan `If-Match: "<etag>"` (key tidak ada → `409 OBJECT_MISSING`, berubah di tengah → `409 CONFLICT`) |
-| Buat folder | `create` pada folder baru | PUT 0 byte `prefix/nama/` + `If-None-Match: *` |
-| Hapus object (bulk, ≤1000 key) | `delete` pada setiap key | `DeleteObjects` |
-| Hapus folder | `delete` pada prefix folder | list rekursif + `DeleteObjects` per 1000, sinkron, **maks 10.000 object** per request (lebih → `422 FOLDER_TOO_LARGE`, akan ditangani job di v2) |
+| Download / preview | `read` | 5-minute presigned GET, `response-content-disposition` = `attachment` (download) or `inline` (preview), 302 |
+| New upload | `create` | `PutObject` + `If-None-Match: *` → 412 mapped to `409 OBJECT_EXISTS` |
+| Overwrite (`overwrite=1`) | `update` (+`create` if the key turns out not to exist) | has create+update → plain PUT; update only → `HeadObject` then PUT with `If-Match: "<etag>"` (key missing → `409 OBJECT_MISSING`, changed in between → `409 CONFLICT`) |
+| Create folder | `create` on the new folder | 0-byte PUT `prefix/name/` + `If-None-Match: *` |
+| Delete objects (bulk, ≤1000 keys) | `delete` on each key | `DeleteObjects` |
+| Delete folder | `delete` on the folder prefix | recursive list + `DeleteObjects` per 1000, synchronous, **max 10,000 objects** per request (more → `422 FOLDER_TOO_LARGE`, to be handled by jobs in v2) |
 
-Catatan:
-- R2 mengevaluasi `If-None-Match: *` secara atomik terhadap state bucket
-  (juga pada `CompleteMultipartUpload`) — tidak ada race create vs create.
+Notes:
+- R2 evaluates `If-None-Match: *` atomically against bucket state
+  (also on `CompleteMultipartUpload`) — no create vs create race.
   minio-go: `PutObjectOptions.SetMatchETagExcept("*")` /
-  `SetMatchETag("*")`; header ikut ke `CompleteMultipartUpload`.
-- Implementasi memakai `If-Match: "<etag>"` (bukan `If-Match: *`) agar
-  tidak bergantung pada dukungan wildcard. Sudah diverifikasi terhadap
-  MinIO (termasuk multipart kondisional). **Masih perlu dijalankan sekali
-  terhadap R2 asli** (`go test -tags integration ./internal/s3x/` dengan
-  env `KUSTORAGE_TEST_KIND=r2`), terutama header kondisional pada
+  `SetMatchETag("*")`; the header is carried to `CompleteMultipartUpload`.
+- The implementation uses `If-Match: "<etag>"` (not `If-Match: *`) so as
+  not to depend on wildcard support. Already verified against
+  MinIO (including conditional multipart). **Still needs to be run once
+  against real R2** (`go test -tags integration ./internal/s3x/` with
+  env `KUSTORAGE_TEST_KIND=r2`), especially the conditional headers on
   multipart.
-- Upload: satu file per request `PUT /api/objects?bucket=&key=` dengan
-  body mentah + `Content-Length` wajib (size diketahui → minio-go memilih
-  part size tetap; part size di-set eksplisit 64 MiB agar memori per
-  upload terbatas dan memenuhi syarat R2 bahwa part berukuran seragam).
-  Batas ukuran default 5 GiB (`KUSTORAGE_MAX_UPLOAD`). Content-Type dari
-  header request (fallback `mime.TypeByExtension`).
-- UI mengunggah paralel maks 3 file, progress via XHR upload events,
-  drag-drop folder memetakan path relatif menjadi key.
+- Upload: one file per request `PUT /api/objects?bucket=&key=` with
+  a raw body + mandatory `Content-Length` (size known → minio-go picks a
+  fixed part size; part size is set explicitly to 64 MiB so memory per
+  upload is bounded and R2's requirement that parts be uniformly sized is met).
+  Default size limit 5 GiB (`KUSTORAGE_MAX_UPLOAD`). Content-Type from the
+  request header (fallback `mime.TypeByExtension`).
+- The UI uploads at most 3 files in parallel, progress via XHR upload events,
+  folder drag-drop maps relative paths to keys.
 
-## Koneksi & bucket
+## Connections & buckets
 
-- Koneksi `kind`:
+- Connection `kind`:
   - `r2`: `account_id`, access key, secret → endpoint
     `https://<account_id>.r2.cloudflarestorage.com`, region `auto`.
-  - `s3`: endpoint bebas, region, `path_style` (bool) — untuk MinIO dsb.
-    (dan dipakai integration test).
-- Secret dienkripsi AES-256-GCM (`cryptx`), tidak pernah dikembalikan ke
-  UI (`hasSecret: true`; field kosong saat edit = tidak diubah).
-- Bucket didaftarkan **manual** per koneksi (token R2 umumnya di-scope
-  per bucket sehingga `ListBuckets` ditolak). Tombol *Discover* mencoba
-  `ListBuckets` bila token mengizinkan.
-- *Test* per bucket: `HeadBucket` + `ListObjectsV2` max-keys 1 + PUT/DELETE
-  object probe opsional (`.ku-storage-probe-<rand>`) untuk memastikan
-  token punya akses tulis.
-- Menghapus pendaftaran bucket menghapus grant-nya (konfirmasi ketik nama,
-  divalidasi backend). Isi bucket di R2 tidak disentuh.
-- Client minio di-pool per koneksi, di-invalidate saat koneksi diubah.
+  - `s3`: arbitrary endpoint, region, `path_style` (bool) — for MinIO etc.
+    (and used by integration tests).
+- Secrets are encrypted with AES-256-GCM (`cryptx`), never returned to the
+  UI (`hasSecret: true`; empty field on edit = unchanged).
+- Buckets are registered **manually** per connection (R2 tokens are usually scoped
+  per bucket, so `ListBuckets` is denied). The *Discover* button tries
+  `ListBuckets` if the token allows it.
+- *Test* per bucket: `HeadBucket` + `ListObjectsV2` max-keys 1 + optional PUT/DELETE
+  of a probe object (`.ku-storage-probe-<rand>`) to make sure the
+  token has write access.
+- Removing a bucket registration deletes its grants (confirmation by typing the name,
+  validated by the backend). Bucket contents in R2 are not touched.
+- minio clients are pooled per connection, invalidated when the connection changes.
 
 ## Auth & session
 
-- Password bcrypt, minimal 10 karakter.
-- **Session server-side** (beda dari token HMAC stateless ku-dump, yang
-  tidak bisa dicabut): token acak 32 byte di cookie
-  `ku_storage_session` (HttpOnly, Secure bila HTTPS, `SameSite=Strict`),
-  yang disimpan di DB hanya SHA-256-nya. Expiry 24 jam, diperpanjang
-  (sliding) bila aktif, absolut maks 7 hari.
-- Nonaktifkan user / reset password → hapus semua session user itu.
-  Grant dibaca dari DB setiap request (cache in-memory ≤ 5 detik,
-  di-invalidate saat grant/grup/user berubah) → pencabutan seketika.
-- **Undangan**: admin membuat user (username, nama, role, grup) → server
-  membuat invite token sekali pakai berlaku 72 jam → admin menyalin link
-  `/invite/<token>` dan mengirimkannya sendiri (tidak ada email di v1).
-  User mengatur password sendiri; admin tidak pernah tahu password.
-  Reset password memakai mekanisme yang sama.
-- Rate limit login 5 gagal / 15 menit per username+IP (salin dari ku-dump).
-- CSRF: `SameSite=Strict` + method non-GET wajib header `Origin` yang sama
-  dengan host (atau `KUSTORAGE_PUBLIC_URL`).
-- User dapat melihat & mengakhiri session aktifnya sendiri ("logout semua
-  perangkat") di halaman Akun.
+- bcrypt passwords, minimum 10 characters.
+- **Server-side sessions** (unlike ku-dump's stateless HMAC tokens, which
+  cannot be revoked): 32-byte random token in the cookie
+  `ku_storage_session` (HttpOnly, Secure when HTTPS, `SameSite=Strict`),
+  of which only the SHA-256 is stored in the DB. 24-hour expiry, extended
+  (sliding) while active, absolute max 7 days.
+- Disabling a user / resetting a password → deletes all of that user's sessions.
+  Grants are read from the DB on every request (in-memory cache ≤ 5 seconds,
+  invalidated when grants/groups/users change) → immediate revocation.
+- **Invitations**: the admin creates a user (username, name, role, groups) → the server
+  creates a single-use invite token valid for 72 hours → the admin copies the link
+  `/invite/<token>` and sends it themselves (no email in v1).
+  Users set their own password; the admin never knows the password.
+  Password reset uses the same mechanism.
+- Login rate limit 5 failures / 15 minutes per username+IP (copied from ku-dump).
+- CSRF: `SameSite=Strict` + non-GET methods require an `Origin` header matching
+  the host (or `KUSTORAGE_PUBLIC_URL`).
+- Users can view & end their own active sessions ("log out all
+  devices") on the Account page.
 
 ## Audit log
 
-Satu baris per aksi yang mengubah data atau mengakses object, termasuk
-penolakan:
+One row per action that modifies data or accesses an object, including
+denials:
 
 ```
 audit_log(id, ts, user_id, username, ip, action, bucket_id, bucket_name,
@@ -244,14 +244,14 @@ audit_log(id, ts, user_id, username, ip, action, bucket_id, bucket_name,
   `object.preview`, `object.upload`, `object.overwrite`, `object.delete`,
   `folder.create`, `folder.delete`, `browse.denied`, `user.*`, `group.*`,
   `grant.*`, `connection.*`, `bucket.*`.
-- List/browse yang berhasil **tidak** dicatat (terlalu bising);
-  penolakannya dicatat.
-- Hapus folder: satu baris ringkasan (`detail`: jumlah object) +
-  daftar key disimpan di `detail` (dipotong 10.000 key).
-- Nama user & bucket di-denormalisasi agar log tetap terbaca setelah
-  entitas dihapus. Retensi default 365 hari (`KUSTORAGE_AUDIT_DAYS`),
-  dibersihkan saat startup + setiap 24 jam.
-- Admin: filter by user, bucket, action, result, rentang waktu; ekspor CSV.
+- Successful list/browse is **not** recorded (too noisy);
+  denials are recorded.
+- Folder delete: one summary row (`detail`: object count) +
+  the key list stored in `detail` (truncated at 10,000 keys).
+- User & bucket names are denormalized so the log stays readable after
+  entities are deleted. Default retention 365 days (`KUSTORAGE_AUDIT_DAYS`),
+  cleaned up at startup + every 24 hours.
+- Admin: filter by user, bucket, action, result, time range; CSV export.
 
 ## Data model (SQLite)
 
@@ -272,156 +272,156 @@ buckets      (id, connection_id → connections, name, display_name,
 grants       (id, subject_type /*user|group*/, subject_id, bucket_id →
               buckets CASCADE, prefix, perms INTEGER, created_by,
               created_at, UNIQUE(subject_type, subject_id, bucket_id, prefix))
-audit_log    (lihat di atas; index ts, user_id, bucket_id)
+audit_log    (see above; index ts, user_id, bucket_id)
 ```
 
-Catatan:
-- Grant dengan `subject_type=user` dihapus saat user dihapus, grup
-  sama — ditangani di layer store (polimorfik, bukan FK).
-- Koneksi tidak bisa dihapus selama masih punya bucket terdaftar.
-- ID eksternal opaque (pola `ids.go` ku-dump).
+Notes:
+- Grants with `subject_type=user` are deleted when the user is deleted, likewise
+  for groups — handled in the store layer (polymorphic, not an FK).
+- A connection cannot be deleted while it still has registered buckets.
+- Opaque external IDs (ku-dump `ids.go` pattern).
 
 ## API
 
-Semua respons error: `{error: "CODE", message: "..."}` (pola ku-dump).
+All error responses: `{error: "CODE", message: "..."}` (ku-dump pattern).
 
-**Auth & akun**
+**Auth & account**
 
-| Method | Path | Fungsi |
+| Method | Path | Function |
 |---|---|---|
 | GET | `/api/auth/status` | `{needsSetup}` |
-| POST | `/api/auth/setup` | buat admin pertama |
+| POST | `/api/auth/setup` | create the first admin |
 | POST | `/api/auth/login`, `/api/auth/logout` | session |
-| GET/POST | `/api/invites/{token}` | cek / set password dari link undangan atau reset |
-| GET | `/api/me` | user + role + daftar titik masuk akses |
-| PUT | `/api/me/password` | ganti password (wajib password lama) |
-| GET/DELETE | `/api/me/sessions`, `/api/me/sessions/{id}` | session aktif |
+| GET/POST | `/api/invites/{token}` | check / set password from an invite or reset link |
+| GET | `/api/me` | user + role + list of access entry points |
+| PUT | `/api/me/password` | change password (old password required) |
+| GET/DELETE | `/api/me/sessions`, `/api/me/sessions/{id}` | active sessions |
 
-**Object (user, dicek authz)**
+**Object (user, authz-checked)**
 
-| Method | Path | Fungsi |
+| Method | Path | Function |
 |---|---|---|
-| GET | `/api/browse?bucket=&prefix=&cursor=` | list folder (nyata atau virtual) + perms efektif |
-| GET | `/api/objects/stat?bucket=&key=` | metadata object |
-| GET | `/api/objects/download?bucket=&key=&inline=0\|1` | 302 ke presigned GET |
-| PUT | `/api/objects?bucket=&key=&overwrite=0\|1` | upload stream (body mentah) |
-| POST | `/api/folders` | `{bucket, prefix, name}` buat folder |
-| POST | `/api/objects/delete` | `{bucket, keys[]}` hapus object & folder (folder = key berakhiran `/`, rekursif) |
+| GET | `/api/browse?bucket=&prefix=&cursor=` | list folder (real or virtual) + effective perms |
+| GET | `/api/objects/stat?bucket=&key=` | object metadata |
+| GET | `/api/objects/download?bucket=&key=&inline=0\|1` | 302 to presigned GET |
+| PUT | `/api/objects?bucket=&key=&overwrite=0\|1` | stream upload (raw body) |
+| POST | `/api/folders` | `{bucket, prefix, name}` create folder |
+| POST | `/api/objects/delete` | `{bucket, keys[]}` delete objects & folders (folder = key ending in `/`, recursive) |
 
 **Admin**
 
-| Method | Path | Fungsi |
+| Method | Path | Function |
 |---|---|---|
-| GET/POST | `/api/admin/users` | list / buat user (+ link undangan) |
-| PUT | `/api/admin/users/{id}` | ubah nama, role, disabled, grup |
-| POST | `/api/admin/users/{id}/reset` | link reset password + putus session |
-| DELETE | `/api/admin/users/{id}` | hapus user |
-| GET | `/api/admin/users/{id}/access` | grant langsung + via grup (tampilan akses efektif) |
-| GET/POST/PUT/DELETE | `/api/admin/groups[/{id}]` | CRUD grup + anggota |
-| GET/POST/PUT/DELETE | `/api/admin/connections[/{id}]` | CRUD koneksi |
+| GET/POST | `/api/admin/users` | list / create users (+ invite link) |
+| PUT | `/api/admin/users/{id}` | change name, role, disabled, groups |
+| POST | `/api/admin/users/{id}/reset` | password reset link + terminate sessions |
+| DELETE | `/api/admin/users/{id}` | delete user |
+| GET | `/api/admin/users/{id}/access` | direct grants + via groups (effective access view) |
+| GET/POST/PUT/DELETE | `/api/admin/groups[/{id}]` | CRUD groups + members |
+| GET/POST/PUT/DELETE | `/api/admin/connections[/{id}]` | CRUD connections |
 | POST | `/api/admin/connections/{id}/discover` | `ListBuckets` |
-| GET/POST/PUT/DELETE | `/api/admin/buckets[/{id}]` | daftar / daftarkan / ubah / hapus pendaftaran bucket |
-| POST | `/api/admin/buckets/{id}/test` | uji akses baca/tulis |
-| GET/POST/PUT/DELETE | `/api/admin/grants[/{id}]` | CRUD grant (filter by subject / bucket) |
-| GET | `/api/admin/audit` , `/api/admin/audit.csv` | audit log + ekspor |
+| GET/POST/PUT/DELETE | `/api/admin/buckets[/{id}]` | list / register / modify / remove bucket registrations |
+| POST | `/api/admin/buckets/{id}/test` | test read/write access |
+| GET/POST/PUT/DELETE | `/api/admin/grants[/{id}]` | CRUD grants (filter by subject / bucket) |
+| GET | `/api/admin/audit` , `/api/admin/audit.csv` | audit log + export |
 
-Route `/api/admin/*` dibungkus middleware `admin`. Semua route object
-memakai satu fungsi `authz.Require(user, bucket, key, perm)` sebelum
-memanggil `s3x` — tidak ada jalur ke R2 yang tidak melewati fungsi ini.
+`/api/admin/*` routes are wrapped in the `admin` middleware. All object routes
+use a single function `authz.Require(user, bucket, key, perm)` before
+calling `s3x` — there is no path to R2 that does not go through this function.
 
 ## Frontend
 
-Stack sama dengan ku-dump: Vite + TypeScript + Tailwind 3, TanStack Query
-(`staleTime` 30 detik, tanpa polling), react-router, lucide-react.
+Same stack as ku-dump: Vite + TypeScript + Tailwind 3, TanStack Query
+(`staleTime` 30 seconds, no polling), react-router, lucide-react.
 
-| Halaman | Isi |
+| Page | Contents |
 |---|---|
-| `/setup`, `/login`, `/invite/:token` | setup admin, login, set password |
-| `/` | **Akses Saya**: kartu titik masuk (bucket · prefix · badge izin) |
-| `/b/:bucketId?prefix=` | **File browser**: breadcrumb, tabel (nama, ukuran, diubah, tipe), sort per halaman, "Muat lagi" (cursor), filter nama di halaman; aksi sesuai perms: Upload (tombol + drag-drop file/folder), Folder baru, Download, Preview (gambar/video/audio/PDF/teks di panel samping), Hapus (multi-select, konfirmasi; folder → ketik nama) |
-| `/account` | ganti password, session aktif |
-| `/admin/users` | tabel user, undang, reset, nonaktifkan, salin link; detail → akses efektif |
-| `/admin/groups` | CRUD grup + anggota |
-| `/admin/access` | daftar grant per bucket; form: subject, bucket, prefix (dengan picker folder yang membrowse bucket), preset izin / checkbox |
-| `/admin/connections` | koneksi + bucket terdaftar, discover, test |
-| `/admin/audit` | tabel audit + filter + ekspor CSV |
+| `/setup`, `/login`, `/invite/:token` | admin setup, login, set password |
+| `/` | **My Access**: entry point cards (bucket · prefix · permission badge) |
+| `/b/:bucketId?prefix=` | **File browser**: breadcrumb, table (name, size, modified, type), per-page sort, "Load more" (cursor), in-page name filter; actions according to perms: Upload (button + file/folder drag-drop), New folder, Download, Preview (image/video/audio/PDF/text in a side panel), Delete (multi-select, confirmation; folder → type the name) |
+| `/account` | change password, active sessions |
+| `/admin/users` | user table, invite, reset, disable, copy link; detail → effective access |
+| `/admin/groups` | CRUD groups + members |
+| `/admin/access` | grant list per bucket; form: subject, bucket, prefix (with a folder picker that browses the bucket), permission presets / checkboxes |
+| `/admin/connections` | connections + registered buckets, discover, test |
+| `/admin/audit` | audit table + filters + CSV export |
 
-UX kunci:
-- Tombol aksi yang tidak diizinkan **disembunyikan** (bukan disabled)
-  agar user tidak bingung; server tetap menegakkan.
-- Upload ke nama yang sudah ada → dialog "Timpa?" hanya bila punya
-  `update`; tanpa `update` → "Ganti nama" otomatis (`nama (1).ext`) atau
-  lewati.
-- Antrian upload melayang (progress per file, retry file gagal, batal).
-- URL menyimpan bucket + prefix sehingga link folder bisa dibagikan ke
-  user lain yang punya akses.
+Key UX:
+- Action buttons that aren't permitted are **hidden** (not disabled)
+  so users aren't confused; the server still enforces.
+- Uploading to a name that already exists → "Overwrite?" dialog only if the user has
+  `update`; without `update` → automatic "Rename" (`name (1).ext`) or
+  skip.
+- Floating upload queue (per-file progress, retry failed files, cancel).
+- The URL stores bucket + prefix so folder links can be shared with
+  other users who have access.
 
 ## Error handling
 
-| Kondisi | Respons |
+| Condition | Response |
 |---|---|
-| tidak login / session habis | `401 UNAUTHENTICATED` → SPA ke `/login` |
-| izin kurang | `403 FORBIDDEN` (+ audit `denied`) |
-| key tidak valid | `400 INVALID_KEY` |
-| object sudah ada (create) | `409 OBJECT_EXISTS` |
-| object tidak ada (update-only) | `409 OBJECT_MISSING` |
-| folder > 10.000 object | `422 FOLDER_TOO_LARGE` |
-| upload > batas | `413 TOO_LARGE` |
-| tanpa Content-Length | `411 LENGTH_REQUIRED` |
-| R2 menolak kredensial / bucket hilang | `502 STORAGE_ERROR` dengan pesan R2 (tanpa membocorkan secret) |
+| not logged in / session expired | `401 UNAUTHENTICATED` → SPA to `/login` |
+| insufficient permission | `403 FORBIDDEN` (+ audit `denied`) |
+| invalid key | `400 INVALID_KEY` |
+| object already exists (create) | `409 OBJECT_EXISTS` |
+| object does not exist (update-only) | `409 OBJECT_MISSING` |
+| folder > 10,000 objects | `422 FOLDER_TOO_LARGE` |
+| upload > limit | `413 TOO_LARGE` |
+| no Content-Length | `411 LENGTH_REQUIRED` |
+| R2 rejects credentials / bucket missing | `502 STORAGE_ERROR` with the R2 message (without leaking the secret) |
 
-Upload yang gagal di tengah: minio-go meng-abort multipart upload;
-sebagai jaring pengaman, dokumentasikan agar admin memasang lifecycle rule
-"abort incomplete multipart uploads" di dashboard R2.
+Uploads that fail midway: minio-go aborts the multipart upload;
+as a safety net, document that admins should set up a lifecycle rule
+"abort incomplete multipart uploads" in the R2 dashboard.
 
-## Konfigurasi
+## Configuration
 
-| Env | Default | Fungsi |
+| Env | Default | Function |
 |---|---|---|
 | `KUSTORAGE_ADDR` | `:8080` | listen address |
-| `KUSTORAGE_DB` | `ku-storage.db` | path SQLite |
-| `KUSTORAGE_CRYPT_KEY` | (auto `.ku-storage-key`) | hex 32 byte AES key |
-| `KUSTORAGE_PUBLIC_URL` | (kosong) | origin publik untuk cek CSRF & link undangan; set bila di belakang reverse proxy |
-| `KUSTORAGE_TRUST_PROXY` | `false` | percaya `X-Forwarded-For` untuk IP di audit & rate limit |
-| `KUSTORAGE_MAX_UPLOAD` | `5GiB` | batas ukuran per file |
-| `KUSTORAGE_AUDIT_DAYS` | `365` | retensi audit |
+| `KUSTORAGE_DB` | `ku-storage.db` | SQLite path |
+| `KUSTORAGE_CRYPT_KEY` | (auto `.ku-storage-key`) | hex 32-byte AES key |
+| `KUSTORAGE_PUBLIC_URL` | (empty) | public origin for CSRF checks & invite links; set when behind a reverse proxy |
+| `KUSTORAGE_TRUST_PROXY` | `false` | trust `X-Forwarded-For` for IPs in audit & rate limit |
+| `KUSTORAGE_MAX_UPLOAD` | `5GiB` | per-file size limit |
+| `KUSTORAGE_AUDIT_DAYS` | `365` | audit retention |
 
-Docker: multi-stage (node → go → `gcr.io/distroless/static`), tidak butuh
-CLI eksternal. Volume `/data` untuk DB + key file.
+Docker: multi-stage (node → go → `gcr.io/distroless/static`), no external
+CLI required. Volume `/data` for the DB + key file.
 
-## Keamanan (ringkasan)
+## Security (summary)
 
-- Kredensial R2 hanya di server, dienkripsi at-rest.
-- Satu jalur authz terpusat; prefix ber-batas `/`; validasi key ketat.
-- Session server-side yang bisa dicabut; cookie HttpOnly/Strict; cek
-  Origin; rate limit login.
-- Presigned GET 5 menit, diterbitkan per request setelah cek izin;
-  konten dibuka dari origin R2 (bukan origin aplikasi).
-- Header keamanan SPA: CSP ketat (`default-src 'self'`, `img-src`/
-  `media-src`/`frame-src` mengizinkan `*.r2.cloudflarestorage.com` untuk
+- R2 credentials only on the server, encrypted at rest.
+- A single centralized authz path; `/`-bounded prefixes; strict key validation.
+- Revocable server-side sessions; HttpOnly/Strict cookie; Origin
+  check; login rate limit.
+- 5-minute presigned GET, issued per request after the permission check;
+  content opened from the R2 origin (not the application origin).
+- SPA security headers: strict CSP (`default-src 'self'`, `img-src`/
+  `media-src`/`frame-src` allow `*.r2.cloudflarestorage.com` for
   preview), `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
-- Audit untuk aksi berhasil maupun ditolak.
+- Audit for both successful and denied actions.
 
 ## Testing
 
-- **Unit `authz`** (prioritas tertinggi, table-driven): normalisasi
-  prefix, batas `/` (`acme/` vs `acme-evil/`), union user+grup, navigasi
-  virtual, validasi key (traversal, `//`, kontrol, unicode).
-- **Unit `meta`**: migrasi, CRUD, cascade grant, session expiry, invite
-  sekali pakai, proteksi admin terakhir.
-- **API tests** (httptest + fake `s3x`): setiap endpoint object dicoba
-  oleh user tanpa izin → 403 + baris audit.
-- **Integration** (`-tags integration`, docker-compose MinIO): upload
-  create/overwrite kondisional, multipart > 64 MiB, hapus folder, presign.
-- **Smoke R2** (opsional, jalan bila env `R2_TEST_*` di-set): verifikasi
-  `If-None-Match: *`, `If-Match: "<etag>"`, conditional pada multipart, dan
-  presigned GET terhadap R2 asli.
+- **`authz` unit tests** (highest priority, table-driven): prefix
+  normalization, `/` boundary (`acme/` vs `acme-evil/`), user+group union, virtual
+  navigation, key validation (traversal, `//`, control chars, unicode).
+- **`meta` unit tests**: migrations, CRUD, grant cascade, session expiry, single-use
+  invites, last-admin protection.
+- **API tests** (httptest + fake `s3x`): every object endpoint is tried
+  by a user without permission → 403 + audit row.
+- **Integration** (`-tags integration`, docker-compose MinIO): conditional
+  create/overwrite upload, multipart > 64 MiB, folder delete, presign.
+- **R2 smoke** (optional, runs when `R2_TEST_*` env is set): verifies
+  `If-None-Match: *`, `If-Match: "<etag>"`, conditionals on multipart, and
+  presigned GET against real R2.
 - Frontend: `tsc` + build.
 
-## Rencana v2 (untuk konteks, bukan scope)
+## v2 plan (for context, not scope)
 
-Share link (izin `share`, TTL maksimum diatur admin, tercatat audit),
-rename/move/copy, job runner untuk operasi rekursif besar + hitung ukuran
-folder, edit metadata & header (Content-Type, Cache-Control), download
-folder sebagai ZIP, upload langsung via presigned PUT (butuh CORS di
-dashboard R2).
+Share links (`share` permission, maximum TTL set by admin, recorded in audit),
+rename/move/copy, job runner for large recursive operations + folder size
+calculation, editing metadata & headers (Content-Type, Cache-Control), downloading
+folders as ZIP, direct upload via presigned PUT (requires CORS in the
+R2 dashboard).
