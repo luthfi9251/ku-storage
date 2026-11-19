@@ -1,7 +1,7 @@
 # ku-storage v1 — Design
 
 Date: 2026-11-19
-Status: Draft (hasil diskusi analisis requirement)
+Status: Implemented (v1)
 
 ## Ringkasan
 
@@ -164,7 +164,7 @@ dari UI divalidasi dengan aturan yang sama sebelum digabung dengan prefix.
 | Stat | `read` | `HeadObject` |
 | Download / preview | `read` | presigned GET 5 menit, `response-content-disposition` = `attachment` (download) atau `inline` (preview), 302 |
 | Upload baru | `create` | `PutObject` + `If-None-Match: *` → 412 dipetakan ke `409 OBJECT_EXISTS` |
-| Timpa (`overwrite=1`) | `update` (+`create` jika ternyata key belum ada) | punya create+update → PUT biasa; hanya update → `If-Match: *` (gagal bila key tidak ada) |
+| Timpa (`overwrite=1`) | `update` (+`create` jika ternyata key belum ada) | punya create+update → PUT biasa; hanya update → `HeadObject` lalu PUT dengan `If-Match: "<etag>"` (key tidak ada → `409 OBJECT_MISSING`, berubah di tengah → `409 CONFLICT`) |
 | Buat folder | `create` pada folder baru | PUT 0 byte `prefix/nama/` + `If-None-Match: *` |
 | Hapus object (bulk, ≤1000 key) | `delete` pada setiap key | `DeleteObjects` |
 | Hapus folder | `delete` pada prefix folder | list rekursif + `DeleteObjects` per 1000, sinkron, **maks 10.000 object** per request (lebih → `422 FOLDER_TOO_LARGE`, akan ditangani job di v2) |
@@ -174,10 +174,12 @@ Catatan:
   (juga pada `CompleteMultipartUpload`) — tidak ada race create vs create.
   minio-go: `PutObjectOptions.SetMatchETagExcept("*")` /
   `SetMatchETag("*")`; header ikut ke `CompleteMultipartUpload`.
-- **Risiko yang wajib diverifikasi di integration test terhadap R2 asli**:
-  (1) `If-Match: *` diterima R2 (R2 memakai strong comparison untuk
-  If-Match); fallback: `HeadObject` lalu PUT dengan `If-Match: "<etag>"`.
-  (2) header kondisional pada `CreateMultipartUpload` tidak ditolak R2.
+- Implementasi memakai `If-Match: "<etag>"` (bukan `If-Match: *`) agar
+  tidak bergantung pada dukungan wildcard. Sudah diverifikasi terhadap
+  MinIO (termasuk multipart kondisional). **Masih perlu dijalankan sekali
+  terhadap R2 asli** (`go test -tags integration ./internal/s3x/` dengan
+  env `KUSTORAGE_TEST_KIND=r2`), terutama header kondisional pada
+  multipart.
 - Upload: satu file per request `PUT /api/objects?bucket=&key=` dengan
   body mentah + `Content-Length` wajib (size diketahui → minio-go memilih
   part size tetap; part size di-set eksplisit 64 MiB agar memori per
@@ -412,7 +414,7 @@ CLI eksternal. Volume `/data` untuk DB + key file.
 - **Integration** (`-tags integration`, docker-compose MinIO): upload
   create/overwrite kondisional, multipart > 64 MiB, hapus folder, presign.
 - **Smoke R2** (opsional, jalan bila env `R2_TEST_*` di-set): verifikasi
-  `If-None-Match: *`, `If-Match: *`, conditional pada multipart, dan
+  `If-None-Match: *`, `If-Match: "<etag>"`, conditional pada multipart, dan
   presigned GET terhadap R2 asli.
 - Frontend: `tsc` + build.
 

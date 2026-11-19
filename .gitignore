@@ -1,0 +1,8 @@
+*.db
+*.db-*
+.ku-storage-key
+/ku-storage
+web/node_modules/
+web/dist/*
+!web/dist/index.html
+data/

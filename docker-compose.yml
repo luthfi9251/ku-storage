@@ -1,0 +1,16 @@
+services:
+  ku-storage:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Set when served behind a reverse proxy / on a public domain:
+      # KUSTORAGE_PUBLIC_URL: https://files.example.com
+      # KUSTORAGE_TRUST_PROXY: "true"
+      KUSTORAGE_MAX_UPLOAD: 5GiB
+    volumes:
+      - ku-storage-data:/data
+    restart: unless-stopped
+
+volumes:
+  ku-storage-data:
