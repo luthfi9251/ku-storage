@@ -76,15 +76,15 @@ export default function Account() {
         title="Account"
         subtitle={
           <>
-            Signed in as <span className="font-mono text-slate-300">{me?.username}</span>
+            Signed in as <span className="font-mono text-gray-700 dark:text-zinc-300">{me?.username}</span>
             {me?.displayName ? ` (${me.displayName})` : ''}
           </>
         }
       />
 
       <Card className="max-w-xl p-6">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
-          <KeyRound size={16} className="text-indigo-400" /> Change password
+        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-zinc-100">
+          <KeyRound size={16} className="text-teal-600 dark:text-teal-400" /> Change password
         </h2>
         <form onSubmit={submit} className="space-y-4">
           <Field label="Current password">
@@ -107,8 +107,8 @@ export default function Account() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-            <Monitor size={16} className="text-indigo-400" /> Active sessions
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-zinc-100">
+            <Monitor size={16} className="text-teal-600 dark:text-teal-400" /> Active sessions
           </h2>
           {others > 0 && (
             <Button size="sm" variant="outline" onClick={() => revokeOthers.mutate()} disabled={revokeOthers.isPending}>
@@ -119,7 +119,7 @@ export default function Account() {
         {sessions.isLoading && <Loading />}
         {sessions.isError && <ErrorBox>{errMsg(sessions.error)}</ErrorBox>}
         {rows.length > 0 && (
-          <Table>
+          <Table className="[&_td]:whitespace-nowrap">
             <thead>
               <tr>
                 <Th>Device</Th>
@@ -131,22 +131,22 @@ export default function Account() {
             </thead>
             <tbody>
               {rows.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-800/30">
+                <tr key={s.id} className="hover:bg-gray-100 dark:hover:bg-zinc-800/30">
                   <Td>
                     <div className="flex items-center gap-2">
-                      <span className="max-w-md truncate text-xs text-slate-300" title={s.userAgent}>
+                      <span className="max-w-md truncate text-xs text-gray-700 dark:text-zinc-300" title={s.userAgent}>
                         {s.userAgent || 'unknown'}
                       </span>
                       {s.current && <Badge tone="green">this device</Badge>}
                     </div>
                   </Td>
-                  <Td className="font-mono text-xs text-slate-400">{s.ip}</Td>
-                  <Td className="text-xs text-slate-400">{fmtDate(s.createdAt)}</Td>
-                  <Td className="text-xs text-slate-400" >
+                  <Td className="font-mono text-xs text-gray-500 dark:text-zinc-400">{s.ip}</Td>
+                  <Td className="whitespace-nowrap text-xs text-gray-500 dark:text-zinc-400">{fmtDate(s.createdAt)}</Td>
+                  <Td className="whitespace-nowrap text-xs text-gray-500 dark:text-zinc-400">
                     <span title={fmtDate(s.lastSeenAt)}>{fmtRelative(s.lastSeenAt)}</span>
                   </Td>
                   <Td className="text-right">
-                    <Button size="sm" variant="ghost" className="hover:text-rose-400" onClick={() => revoke.mutate(s)} disabled={revoke.isPending}>
+                    <Button size="sm" variant="ghost" className="hover:text-rose-600 dark:hover:text-rose-400" onClick={() => revoke.mutate(s)} disabled={revoke.isPending}>
                       {s.current ? 'Log out' : 'Revoke'}
                     </Button>
                   </Td>

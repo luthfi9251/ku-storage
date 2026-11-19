@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { loading, me } = useAuth()
   const loc = useLocation()
-  if (loading) return <div className="p-8 text-slate-500">Loading…</div>
+  if (loading) return <div className="p-8 text-gray-500 dark:text-zinc-500">Loading…</div>
   if (!me) return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />
   return <>{children}</>
 }

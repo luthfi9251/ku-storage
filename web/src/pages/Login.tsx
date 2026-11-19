@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BadgeCheck, KeyRound, ShieldAlert, User } from 'lucide-react'
+import { BadgeCheck, KeyRound, User } from 'lucide-react'
 import { useAuth } from '../auth'
 import { errMsg } from '../lib/api'
-import { Button, ErrorBox, Field, Input, Spinner } from '../ui'
+import { Button, ErrorBox, Field, InfoBox, Input, Spinner } from '../ui'
 import AuthShell from './AuthShell'
 
 export default function Login() {
@@ -42,28 +42,29 @@ export default function Login() {
   }
 
   return (
-    <AuthShell subtitle="Cloudflare R2 access broker" onSubmit={onSubmit}>
+    <AuthShell
+      title={needsSetup ? 'Set up ku-storage' : 'Welcome back'}
+      subtitle={needsSetup ? 'Create the first administrator account.' : 'Log in to see the files shared with you.'}
+      onSubmit={onSubmit}
+    >
       {needsSetup && (
-        <div className="flex items-start gap-2 rounded-xl border border-sky-800/60 bg-sky-950/40 p-3 text-xs text-sky-300">
-          <ShieldAlert size={16} className="mt-0.5 shrink-0" />
-          <div>
-            <span className="block font-semibold">First Run Setup</span>
-            Create the initial administrator account (username 3–64 chars of a–z 0–9 . _ -, password ≥ 10 chars).
-          </div>
-        </div>
+        <InfoBox>
+          <span className="block font-semibold">First run setup</span>
+          Create the initial administrator account (username 3–64 chars of a–z 0–9 . _ -, password ≥ 10 chars).
+        </InfoBox>
       )}
 
       <div className="space-y-4">
         <Field label="Username">
           <div className="relative">
-            <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <User size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="admin"
               autoFocus
               autoComplete="username"
-              className="pl-9"
+              className="h-10 pl-9"
               required
             />
           </div>
@@ -72,22 +73,22 @@ export default function Login() {
         {needsSetup && (
           <Field label="Display name" hint="optional">
             <div className="relative">
-              <BadgeCheck size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Administrator" className="pl-9" />
+              <BadgeCheck size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
+              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Administrator" className="h-10 pl-9" />
             </div>
           </Field>
         )}
 
         <Field label="Password">
           <div className="relative">
-            <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <KeyRound size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••"
               autoComplete={needsSetup ? 'new-password' : 'current-password'}
-              className="pl-9"
+              className="h-10 pl-9"
               required
             />
           </div>
@@ -96,14 +97,14 @@ export default function Login() {
         {needsSetup && (
           <Field label="Confirm password">
             <div className="relative">
-              <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <KeyRound size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
               <Input
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="••••••••••"
                 autoComplete="new-password"
-                className="pl-9"
+                className="h-10 pl-9"
                 required
               />
             </div>
@@ -113,8 +114,8 @@ export default function Login() {
 
       <ErrorBox>{error}</ErrorBox>
 
-      <Button type="submit" disabled={busy} className="w-full justify-center py-2.5 shadow-lg shadow-indigo-600/25">
-        {busy ? <Spinner className="border-white/30 border-t-white" /> : needsSetup ? 'Create Admin Account & Log In' : 'Log In'}
+      <Button type="submit" disabled={busy} size="lg" className="w-full">
+        {busy ? <Spinner className="border-white/30 border-t-white" /> : needsSetup ? 'Create admin account & log in' : 'Log in'}
       </Button>
     </AuthShell>
   )

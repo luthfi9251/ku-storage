@@ -72,7 +72,7 @@ export default function Access() {
       />
 
       <div className="flex flex-wrap gap-3">
-        <Select value={bucket} onChange={(e) => setBucket(e.target.value)} className="w-auto min-w-[12rem]">
+        <Select value={bucket} onChange={(e) => setBucket(e.target.value)} className="w-full sm:w-auto sm:min-w-[12rem]">
           <option value="">All buckets</option>
           {(buckets.data ?? []).map((b) => (
             <option key={b.id} value={b.id}>
@@ -80,7 +80,7 @@ export default function Access() {
             </option>
           ))}
         </Select>
-        <Select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-auto min-w-[12rem]">
+        <Select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full sm:w-auto sm:min-w-[12rem]">
           <option value="">All users & groups</option>
           <optgroup label="Groups">
             {(groups.data ?? []).map((g) => (
@@ -103,7 +103,7 @@ export default function Access() {
       {grants.isError && <ErrorBox>{errMsg(grants.error)}</ErrorBox>}
       {grants.data && rows.length === 0 && <EmptyState>No grants match.</EmptyState>}
       {rows.length > 0 && (
-        <Table>
+        <Table className="[&_td]:whitespace-nowrap">
           <thead>
             <tr>
               <Th>Subject</Th>
@@ -115,31 +115,31 @@ export default function Access() {
           </thead>
           <tbody>
             {rows.map((g) => (
-              <tr key={g.id} className="hover:bg-slate-800/30">
+              <tr key={g.id} className="hover:bg-gray-100 dark:hover:bg-zinc-800/30">
                 <Td>
                   <div className="flex items-center gap-2">
-                    {g.subjectType === 'group' ? <UsersRound size={14} className="text-indigo-400" /> : <UserIcon size={14} className="text-slate-400" />}
-                    <span className="text-slate-100">{g.subjectName}</span>
+                    {g.subjectType === 'group' ? <UsersRound size={14} className="text-teal-600 dark:text-teal-400" /> : <UserIcon size={14} className="text-gray-500 dark:text-zinc-400" />}
+                    <span className="text-gray-900 dark:text-zinc-100">{g.subjectName}</span>
                     {g.subjectType === 'group' && <Badge tone="indigo">group</Badge>}
                   </div>
                 </Td>
-                <Td className="font-mono text-xs">
-                  <span className="text-slate-200">{g.bucketName}</span>
-                  <span className="text-slate-400">/{g.prefix}</span>
+                <Td className="whitespace-nowrap font-mono text-xs">
+                  <span className="text-gray-800 dark:text-zinc-200">{g.bucketName}</span>
+                  <span className="text-gray-500 dark:text-zinc-400">/{g.prefix}</span>
                 </Td>
                 <Td>
                   <div className="flex items-center gap-2">
-                    <span className="w-20 text-xs text-slate-400">{presetName(g.perms)}</span>
-                    <PermBadges perms={g.perms} />
+                    <span className="w-20 text-xs text-gray-500 dark:text-zinc-400">{presetName(g.perms)}</span>
+                    <PermBadges perms={g.perms} className="flex-nowrap" />
                   </div>
                 </Td>
-                <Td className="text-xs text-slate-400">{fmtDate(g.createdAt)}</Td>
+                <Td className="whitespace-nowrap text-xs text-gray-500 dark:text-zinc-400">{fmtDate(g.createdAt)}</Td>
                 <Td>
                   <div className="flex justify-end gap-1">
-                    <Button size="sm" variant="ghost" title="Edit" onClick={() => setEditing(g)}>
+                    <Button size="sm" variant="ghost" title="Edit" aria-label="Edit" onClick={() => setEditing(g)}>
                       <Pencil size={14} />
                     </Button>
-                    <Button size="sm" variant="ghost" className="hover:text-rose-400" title="Delete" onClick={() => setDeleting(g)}>
+                    <Button size="sm" variant="ghost" className="hover:text-rose-600 dark:hover:text-rose-400" title="Delete" aria-label="Delete" onClick={() => setDeleting(g)}>
                       <Trash2 size={14} />
                     </Button>
                   </div>
@@ -209,15 +209,15 @@ function PermsEditor({ value, onChange }: { value: Perms; onChange: (p: Perms) =
             className={cn(
               'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
               samePerms(p.perms, value)
-                ? 'border-indigo-500/50 bg-indigo-600/20 text-indigo-200'
-                : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800',
+                ? 'border-teal-400 dark:border-teal-500/50 bg-teal-50 dark:bg-teal-600/20 text-teal-800 dark:text-teal-200'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800',
             )}
           >
             {p.label}
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+      <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-3">
         <Checkbox checked={value.read} onChange={(v) => set('read', v)} label="Read — list, preview, download" />
         <Checkbox checked={value.create} onChange={(v) => set('create', v)} label="Create — upload new, new folder" />
         <Checkbox checked={value.update} onChange={(v) => set('update', v)} label="Update — overwrite existing" />
@@ -282,11 +282,11 @@ function GrantModal({
         }}
       >
         {grant ? (
-          <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-sm">
-            <span className="text-slate-400">{grant.subjectType === 'group' ? 'Group' : 'User'}:</span>{' '}
-            <span className="text-slate-100">{grant.subjectName}</span>
-            <span className="mx-2 text-slate-600">·</span>
-            <span className="text-slate-400">Bucket:</span> <span className="font-mono text-slate-100">{grant.bucketName}</span>
+          <div className="rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-3 text-sm">
+            <span className="text-gray-500 dark:text-zinc-400">{grant.subjectType === 'group' ? 'Group' : 'User'}:</span>{' '}
+            <span className="text-gray-900 dark:text-zinc-100">{grant.subjectName}</span>
+            <span className="mx-2 text-gray-400 dark:text-zinc-600">·</span>
+            <span className="text-gray-500 dark:text-zinc-400">Bucket:</span> <span className="font-mono text-gray-900 dark:text-zinc-100">{grant.bucketName}</span>
           </div>
         ) : (
           <div className="grid grid-cols-[8rem_1fr] gap-3">
@@ -351,11 +351,11 @@ function GrantModal({
           />
         )}
         <div className="space-y-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Permissions</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Permissions</span>
           <PermsEditor value={perms} onChange={setPerms} />
         </div>
         {!grant && (
-          <p className="text-xs text-slate-500">Saving a grant for the same subject, bucket and prefix updates the existing one.</p>
+          <p className="text-xs text-gray-500 dark:text-zinc-500">Saving a grant for the same subject, bucket and prefix updates the existing one.</p>
         )}
         <ErrorBox>{error}</ErrorBox>
         <div className="flex justify-end gap-2">
@@ -377,46 +377,46 @@ export function FolderPicker({ bucketId, initial, onPick }: { bucketId: string; 
   const b = useBrowse(bucketId, prefix)
   const data = b.merged
   return (
-    <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+    <div className="space-y-2 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/60 p-3">
       <div className="flex flex-wrap items-center gap-1 text-xs">
-        <button type="button" className="flex items-center gap-1 rounded px-1.5 py-0.5 text-slate-200 hover:bg-slate-800" onClick={() => setPrefix('')}>
-          <Database size={12} className="text-indigo-400" /> {data?.bucket.name ?? 'bucket'}
+        <button type="button" className="flex items-center gap-1 rounded px-1.5 py-0.5 text-gray-800 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800" onClick={() => setPrefix('')}>
+          <Database size={12} className="text-teal-600 dark:text-teal-400" /> {data?.bucket.name ?? 'bucket'}
         </button>
         {crumbs(prefix).map((c) => (
           <span key={c.prefix} className="flex items-center gap-1">
-            <ChevronRight size={12} className="text-slate-600" />
-            <button type="button" className="rounded px-1.5 py-0.5 text-slate-300 hover:bg-slate-800" onClick={() => setPrefix(c.prefix)}>
+            <ChevronRight size={12} className="text-gray-400 dark:text-zinc-600" />
+            <button type="button" className="rounded px-1.5 py-0.5 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800" onClick={() => setPrefix(c.prefix)}>
               {c.label}
             </button>
           </span>
         ))}
       </div>
-      <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60">
+      <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         {b.isLoading && (
           <div className="flex justify-center p-4">
             <Spinner />
           </div>
         )}
         {b.isError && <ErrorBox className="m-2">{errMsg(b.error)}</ErrorBox>}
-        {data && data.folders.length === 0 && <div className="p-3 text-xs text-slate-500">No subfolders.</div>}
+        {data && data.folders.length === 0 && <div className="p-3 text-xs text-gray-500 dark:text-zinc-500">No subfolders.</div>}
         {data?.folders.map((f) => (
           <button
             key={f.prefix}
             type="button"
-            className="flex w-full items-center gap-2 border-b border-slate-800/60 px-3 py-1.5 text-left text-sm text-slate-200 last:border-0 hover:bg-slate-800/60"
+            className="flex w-full items-center gap-2 border-b border-gray-200 dark:border-zinc-800/60 px-3 py-1.5 text-left text-sm text-gray-800 dark:text-zinc-200 last:border-0 hover:bg-gray-100 dark:hover:bg-zinc-800/60"
             onClick={() => setPrefix(f.prefix)}
           >
-            <Folder size={14} className="text-indigo-400" /> {f.name}
+            <Folder size={14} className="text-teal-600 dark:text-teal-400" /> {f.name}
           </button>
         ))}
         {b.hasNextPage && (
-          <button type="button" className="w-full px-3 py-1.5 text-xs text-indigo-300 hover:bg-slate-800/60" onClick={() => void b.fetchNextPage()} disabled={b.isFetchingNextPage}>
+          <button type="button" className="w-full px-3 py-1.5 text-xs text-teal-700 dark:text-teal-300 hover:bg-gray-100 dark:hover:bg-zinc-800/60" onClick={() => void b.fetchNextPage()} disabled={b.isFetchingNextPage}>
             {b.isFetchingNextPage ? 'Loading…' : 'Load more'}
           </button>
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-xs text-slate-400">/{prefix}</span>
+        <span className="truncate font-mono text-xs text-gray-500 dark:text-zinc-400">/{prefix}</span>
         <Button type="button" size="sm" onClick={() => onPick(prefix)}>
           Use this folder
         </Button>

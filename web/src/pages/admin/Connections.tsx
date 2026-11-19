@@ -76,15 +76,15 @@ export default function Connections() {
 
       <div className="space-y-4">
         {rows.map((c) => (
-          <div key={c.id} className="rounded-2xl border border-slate-800 bg-slate-900/80 shadow-xl">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 p-5">
+          <div key={c.id} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 dark:border-zinc-800 p-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-teal-300 dark:border-teal-500/20 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400">
                   <Cable size={20} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-semibold text-slate-100">{c.name}</span>
+                    <span className="truncate font-semibold text-gray-900 dark:text-zinc-100">{c.name}</span>
                     <Badge tone={c.kind === 'r2' ? 'amber' : 'blue'}>{c.kind}</Badge>
                     {c.hasSecret && (
                       <Badge tone="green">
@@ -92,7 +92,7 @@ export default function Connections() {
                       </Badge>
                     )}
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-xs text-slate-400">
+                  <div className="mt-0.5 truncate font-mono text-xs text-gray-500 dark:text-zinc-400">
                     {c.kind === 'r2' ? `account ${c.accountId}` : `${c.endpoint} · ${c.region || 'no region'}${c.pathStyle ? ' · path-style' : ''}`}
                     {' · key '}
                     {c.accessKey}
@@ -106,13 +106,13 @@ export default function Connections() {
                 <Button size="sm" variant="outline" onClick={() => setAddBucket({ conn: c, name: '' })}>
                   <Plus size={14} /> Add bucket
                 </Button>
-                <Button size="sm" variant="ghost" title="Edit" onClick={() => setEditing(c)}>
+                <Button size="sm" variant="ghost" title="Edit" aria-label="Edit" onClick={() => setEditing(c)}>
                   <Pencil size={14} />
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="hover:text-rose-400"
+                  className="hover:text-rose-600 dark:hover:text-rose-400"
                   title={c.buckets.length > 0 ? 'Remove its buckets first' : 'Delete'}
                   disabled={c.buckets.length > 0}
                   onClick={() => setDeleting(c)}
@@ -122,18 +122,18 @@ export default function Connections() {
               </div>
             </div>
             {c.buckets.length === 0 ? (
-              <div className="p-5 text-xs text-slate-500">No buckets registered on this connection.</div>
+              <div className="p-5 text-xs text-gray-500 dark:text-zinc-500">No buckets registered on this connection.</div>
             ) : (
-              <ul className="divide-y divide-slate-800/70">
+              <ul className="divide-y divide-gray-200 dark:divide-zinc-800/70">
                 {c.buckets.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <Database size={16} className="shrink-0 text-indigo-400" />
+                      <Database size={16} className="shrink-0 text-teal-600 dark:text-teal-400" />
                       <div className="min-w-0">
-                        <a href={browserLink(b.id, '')} className="truncate font-medium text-slate-100 hover:text-indigo-300">
+                        <a href={browserLink(b.id, '')} className="truncate font-medium text-gray-900 dark:text-zinc-100 hover:text-teal-700 dark:hover:text-teal-300">
                           {b.displayName || b.name}
                         </a>
-                        <div className="font-mono text-xs text-slate-500">
+                        <div className="font-mono text-xs text-gray-500 dark:text-zinc-500">
                           {b.name} · {b.grantCount} grant{b.grantCount === 1 ? '' : 's'}
                         </div>
                       </div>
@@ -142,10 +142,10 @@ export default function Connections() {
                       <Button size="sm" variant="ghost" onClick={() => setTestBucket(b)}>
                         <CheckCircle2 size={14} /> Test
                       </Button>
-                      <Button size="sm" variant="ghost" title="Edit display name" onClick={() => setEditBucket(b)}>
+                      <Button size="sm" variant="ghost" title="Edit display name" aria-label="Edit display name" onClick={() => setEditBucket(b)}>
                         <Pencil size={14} />
                       </Button>
-                      <Button size="sm" variant="ghost" className="hover:text-rose-400" title="Unregister" onClick={() => setDeleteBucket(b)}>
+                      <Button size="sm" variant="ghost" className="hover:text-rose-600 dark:hover:text-rose-400" title="Unregister" aria-label="Unregister" onClick={() => setDeleteBucket(b)}>
                         <Trash2 size={14} />
                       </Button>
                     </div>
@@ -354,15 +354,15 @@ function DiscoverModal({ conn, onClose, onPick }: { conn: Connection; onClose: (
         {run.isError && (
           <ErrorBox>
             {errMsg(run.error)}
-            <div className="mt-1 text-rose-400/80">Bucket-scoped R2 tokens usually can't list buckets — use “Add bucket” with the name instead.</div>
+            <div className="mt-1 text-rose-600/80 dark:text-rose-400/80">Bucket-scoped R2 tokens usually can't list buckets — use “Add bucket” with the name instead.</div>
           </ErrorBox>
         )}
-        {run.data && run.data.buckets.length === 0 && <div className="text-sm text-slate-500">No buckets visible to this token.</div>}
+        {run.data && run.data.buckets.length === 0 && <div className="text-sm text-gray-500 dark:text-zinc-500">No buckets visible to this token.</div>}
         {run.data && run.data.buckets.length > 0 && (
-          <ul className="divide-y divide-slate-800 rounded-lg border border-slate-800">
+          <ul className="divide-y divide-gray-200 dark:divide-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-800">
             {run.data.buckets.map((name) => (
               <li key={name} className="flex items-center justify-between px-3 py-2">
-                <span className="font-mono text-sm text-slate-200">{name}</span>
+                <span className="font-mono text-sm text-gray-800 dark:text-zinc-200">{name}</span>
                 {registered.has(name) ? (
                   <Badge tone="green">registered</Badge>
                 ) : (
@@ -448,16 +448,16 @@ function TestModal({ bucket, onClose }: { bucket: Bucket; onClose: () => void })
         {run.isError && <ErrorBox>{errMsg(run.error)}</ErrorBox>}
         {run.data && (
           <div className="space-y-2">
-            <div className={run.data.ok ? 'text-sm font-semibold text-emerald-400' : 'text-sm font-semibold text-rose-400'}>
+            <div className={run.data.ok ? 'text-sm font-semibold text-emerald-600 dark:text-emerald-400' : 'text-sm font-semibold text-rose-600 dark:text-rose-400'}>
               {run.data.ok ? 'All checks passed' : 'Some checks failed'}
             </div>
             <ul className="space-y-1.5">
               {run.data.steps.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 rounded-lg border border-slate-800 bg-slate-950/50 p-2.5 text-xs">
-                  {s.ok ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" /> : <XCircle size={14} className="mt-0.5 shrink-0 text-rose-400" />}
+                <li key={i} className="flex items-start gap-2 rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-2.5 text-xs">
+                  {s.ok ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" /> : <XCircle size={14} className="mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />}
                   <div className="min-w-0">
-                    <div className="font-medium text-slate-200">{s.name}</div>
-                    {s.message && <div className="break-words text-slate-400">{s.message}</div>}
+                    <div className="font-medium text-gray-800 dark:text-zinc-200">{s.name}</div>
+                    {s.message && <div className="break-words text-gray-500 dark:text-zinc-400">{s.message}</div>}
                   </div>
                 </li>
               ))}

@@ -50,40 +50,44 @@ export default function Invite() {
   const reset = info.data?.purpose === 'reset'
 
   return (
-    <AuthShell subtitle={reset ? 'Reset your password' : 'Welcome! Set a password to activate your account'} onSubmit={onSubmit}>
+    <AuthShell
+      title={reset ? 'Reset your password' : 'Activate your account'}
+      subtitle={reset ? 'Choose a new password for your account.' : 'Welcome! Set a password to get started.'}
+      onSubmit={onSubmit}
+    >
       {info.isLoading && <Loading />}
       {info.isError && (
         <div className="space-y-4">
           <ErrorBox>{errMsg(info.error, 'This link is invalid or has expired.')}</ErrorBox>
-          <p className="text-center text-xs text-slate-400">
-            Ask your administrator for a new link, or <Link to="/login" className="text-indigo-400 hover:underline">go to login</Link>.
+          <p className="text-center text-xs text-gray-500 dark:text-zinc-400">
+            Ask your administrator for a new link, or <Link to="/login" className="text-teal-600 dark:text-teal-400 hover:underline">go to login</Link>.
           </p>
         </div>
       )}
       {info.data && (
         <>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
-            <div className="text-[11px] uppercase tracking-wider text-slate-500">Account</div>
-            <div className="font-semibold text-slate-100">{info.data.displayName || info.data.username}</div>
-            <div className="font-mono text-xs text-slate-400">{info.data.username}</div>
+          <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/60 p-3 text-sm">
+            <div className="text-xs font-medium text-gray-500 dark:text-zinc-500">Account</div>
+            <div className="font-semibold text-gray-900 dark:text-zinc-100">{info.data.displayName || info.data.username}</div>
+            <div className="font-mono text-xs text-gray-500 dark:text-zinc-400">{info.data.username}</div>
           </div>
           <div className="space-y-4">
             <Field label="New password" hint="min. 10 characters">
               <div className="relative">
-                <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus className="pl-9" required />
+                <KeyRound size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus className="h-10 pl-9" required />
               </div>
             </Field>
             <Field label="Confirm password">
               <div className="relative">
-                <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" className="pl-9" required />
+                <KeyRound size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
+                <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" className="h-10 pl-9" required />
               </div>
             </Field>
           </div>
           <ErrorBox>{error}</ErrorBox>
-          <Button type="submit" disabled={busy} className="w-full justify-center py-2.5">
-            {busy ? <Spinner className="border-white/30 border-t-white" /> : reset ? 'Set New Password & Log In' : 'Activate Account & Log In'}
+          <Button type="submit" disabled={busy} size="lg" className="w-full">
+            {busy ? <Spinner className="border-white/30 border-t-white" /> : reset ? 'Set new password & log in' : 'Activate account & log in'}
           </Button>
         </>
       )}

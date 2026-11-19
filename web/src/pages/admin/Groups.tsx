@@ -57,24 +57,24 @@ export default function Groups() {
       {groups.data && rows.length === 0 && <EmptyState>No groups yet.</EmptyState>}
       <div className="grid gap-4 lg:grid-cols-2">
         {rows.map((g) => (
-          <div key={g.id} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
+          <div key={g.id} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-teal-300 dark:border-teal-500/20 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400">
                   <UsersRound size={20} />
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate font-semibold text-slate-100">{g.name}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="truncate font-semibold text-gray-900 dark:text-zinc-100">{g.name}</div>
+                  <div className="text-xs text-gray-500 dark:text-zinc-500">
                     {g.members.length} member{g.members.length === 1 ? '' : 's'}
                   </div>
                 </div>
               </div>
               <div className="flex shrink-0 gap-1">
-                <Button size="sm" variant="ghost" title="Edit" onClick={() => setEditing(g)}>
+                <Button size="sm" variant="ghost" title="Edit" aria-label="Edit" onClick={() => setEditing(g)}>
                   <Pencil size={14} />
                 </Button>
-                <Button size="sm" variant="ghost" className="hover:text-rose-400" title="Delete" onClick={() => setDeleting(g)}>
+                <Button size="sm" variant="ghost" className="hover:text-rose-600 dark:hover:text-rose-400" title="Delete" aria-label="Delete" onClick={() => setDeleting(g)}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -157,15 +157,15 @@ function GroupModal({ group, users, onClose, onSaved }: { group?: Group; users: 
         </Field>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Members</span>
-            <span className="text-xs text-slate-500">{memberIds.length} selected</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Members</span>
+            <span className="text-xs text-gray-500 dark:text-zinc-500">{memberIds.length} selected</span>
           </div>
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-zinc-500" />
             <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter users" className="pl-8" />
           </div>
-          <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/50 p-2.5">
-            {shown.length === 0 && <div className="text-xs text-slate-500">No users.</div>}
+          <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-2.5">
+            {shown.length === 0 && <div className="text-xs text-gray-500 dark:text-zinc-500">No users.</div>}
             {shown.map((u) => (
               <Checkbox
                 key={u.id}
@@ -174,7 +174,7 @@ function GroupModal({ group, users, onClose, onSaved }: { group?: Group; users: 
                 onChange={(on) => setMemberIds(on ? [...memberIds, u.id] : memberIds.filter((x) => x !== u.id))}
                 label={
                   <span className="truncate">
-                    {u.displayName || u.username} <span className="font-mono text-xs text-slate-500">{u.username}</span>
+                    {u.displayName || u.username} <span className="font-mono text-xs text-gray-500 dark:text-zinc-500">{u.username}</span>
                   </span>
                 }
               />

@@ -85,7 +85,7 @@ export default function Users() {
       {users.isError && <ErrorBox>{errMsg(users.error)}</ErrorBox>}
       {users.data && rows.length === 0 && <EmptyState>No users.</EmptyState>}
       {rows.length > 0 && (
-        <Table>
+        <Table className="[&_td]:whitespace-nowrap">
           <thead>
             <tr>
               <Th>User</Th>
@@ -98,18 +98,18 @@ export default function Users() {
           </thead>
           <tbody>
             {rows.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-800/30">
+              <tr key={u.id} className="hover:bg-gray-100 dark:hover:bg-zinc-800/30">
                 <Td>
-                  <div className="font-medium text-slate-100">
+                  <div className="font-medium text-gray-900 dark:text-zinc-100">
                     {u.displayName || u.username}
-                    {u.id === me?.id && <span className="ml-2 text-[10px] text-slate-500">(you)</span>}
+                    {u.id === me?.id && <span className="ml-2 text-[10px] text-gray-500 dark:text-zinc-500">(you)</span>}
                   </div>
-                  <div className="font-mono text-xs text-slate-500">{u.username}</div>
+                  <div className="font-mono text-xs text-gray-500 dark:text-zinc-500">{u.username}</div>
                 </Td>
                 <Td>{u.role === 'admin' ? <Badge tone="violet">admin</Badge> : <Badge tone="slate">user</Badge>}</Td>
                 <Td>
                   <div className="flex flex-wrap gap-1">
-                    {u.groups.length === 0 && <span className="text-xs text-slate-600">—</span>}
+                    {u.groups.length === 0 && <span className="text-xs text-gray-400 dark:text-zinc-600">—</span>}
                     {u.groups.map((g) => (
                       <Badge key={g.id} tone="indigo" className="normal-case">
                         {g.name}
@@ -118,15 +118,15 @@ export default function Users() {
                   </div>
                 </Td>
                 <Td>{userStatus(u)}</Td>
-                <Td className="text-xs text-slate-400">
+                <Td className="whitespace-nowrap text-xs text-gray-500 dark:text-zinc-400">
                   <span title={fmtDate(u.lastLoginAt)}>{fmtRelative(u.lastLoginAt)}</span>
                 </Td>
                 <Td>
                   <div className="flex justify-end gap-1">
-                    <Button size="sm" variant="ghost" title="Effective access" onClick={() => setAccessOf(u)}>
+                    <Button size="sm" variant="ghost" title="Effective access" aria-label="Effective access" onClick={() => setAccessOf(u)}>
                       <FolderLock size={14} />
                     </Button>
-                    <Button size="sm" variant="ghost" title="Edit" onClick={() => setEditing(u)}>
+                    <Button size="sm" variant="ghost" title="Edit" aria-label="Edit" onClick={() => setEditing(u)}>
                       <Pencil size={14} />
                     </Button>
                     <Button
@@ -147,7 +147,7 @@ export default function Users() {
                     >
                       <KeyRound size={14} />
                     </Button>
-                    <Button size="sm" variant="ghost" className="hover:text-rose-400" title="Delete" onClick={() => setDeleting(u)} disabled={u.id === me?.id}>
+                    <Button size="sm" variant="ghost" className="hover:text-rose-600 dark:hover:text-rose-400" title="Delete" aria-label="Delete" onClick={() => setDeleting(u)} disabled={u.id === me?.id}>
                       <Trash2 size={14} />
                     </Button>
                   </div>
@@ -207,9 +207,9 @@ export default function Users() {
 }
 
 function GroupPicker({ groups, value, onChange }: { groups: Group[]; value: string[]; onChange: (v: string[]) => void }) {
-  if (groups.length === 0) return <div className="text-xs text-slate-500">No groups yet.</div>
+  if (groups.length === 0) return <div className="text-xs text-gray-500 dark:text-zinc-500">No groups yet.</div>
   return (
-    <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/50 p-2.5">
+    <div className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-2.5">
       {groups.map((g) => (
         <Checkbox
           key={g.id}
@@ -281,7 +281,7 @@ function UserModal({
           </Select>
         </Field>
         <div className="space-y-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">Groups</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Groups</span>
           <GroupPicker groups={groups} value={groupIds} onChange={setGroupIds} />
         </div>
         {user && <Checkbox checked={disabled} onChange={setDisabled} label="Disabled (cannot log in; sessions are ended)" />}
@@ -304,12 +304,12 @@ function LinkModal({ title, user, invite, onClose }: { title: string; user: User
   return (
     <Modal open onClose={onClose} title={title} subtitle={`for ${user.username}`}>
       <div className="space-y-4">
-        <p className="text-sm text-slate-300">Send this one-time link to the user. It lets them set their own password.</p>
+        <p className="text-sm text-gray-700 dark:text-zinc-300">Send this one-time link to the user. It lets them set their own password.</p>
         <div className="flex items-center gap-2">
           <Input readOnly value={url} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
           <CopyButton text={url} />
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-gray-500 dark:text-zinc-500">
           Expires {fmtDate(invite.expiresAt)} ({fmtRelative(invite.expiresAt)}). It won't be shown again — generate a new one with the key button if lost.
         </p>
         <div className="flex justify-end">
@@ -334,13 +334,13 @@ function AccessDrawer({ user, onClose }: { user: User | null; onClose: () => voi
       {q.data && (
         <div className="space-y-6">
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Grants</h3>
-            {q.data.grants.length === 0 && <div className="text-sm text-slate-500">No grants.</div>}
+            <h3 className="text-sm font-medium text-gray-500 dark:text-zinc-400">Grants</h3>
+            {q.data.grants.length === 0 && <div className="text-sm text-gray-500 dark:text-zinc-500">No grants.</div>}
             <ul className="space-y-2">
               {q.data.grants.map((g) => (
-                <li key={g.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                <li key={g.id} className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-mono text-xs text-slate-200">
+                    <span className="truncate font-mono text-xs text-gray-800 dark:text-zinc-200">
                       {g.bucketName}/{g.prefix}
                     </span>
                     {g.via === 'group' ? <Badge tone="indigo" className="normal-case">via group {g.subjectName}</Badge> : <Badge tone="slate">direct</Badge>}
@@ -351,12 +351,12 @@ function AccessDrawer({ user, onClose }: { user: User | null; onClose: () => voi
             </ul>
           </section>
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Entry points</h3>
-            {q.data.access.length === 0 && <div className="text-sm text-slate-500">None.</div>}
+            <h3 className="text-sm font-medium text-gray-500 dark:text-zinc-400">Entry points</h3>
+            {q.data.access.length === 0 && <div className="text-sm text-gray-500 dark:text-zinc-500">None.</div>}
             <ul className="space-y-2">
               {q.data.access.map((a) => (
-                <li key={`${a.bucketId}:${a.prefix}`} className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-                  <a href={browserLink(a.bucketId, a.prefix)} className="truncate font-mono text-xs text-indigo-300 hover:underline">
+                <li key={`${a.bucketId}:${a.prefix}`} className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/50 p-3">
+                  <a href={browserLink(a.bucketId, a.prefix)} className="truncate font-mono text-xs text-teal-700 dark:text-teal-300 hover:underline">
                     {a.displayName || a.bucketName}/{a.prefix}
                   </a>
                   <PermBadges perms={a.perms} />
