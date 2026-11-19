@@ -107,8 +107,8 @@ day" so interrupted large uploads do not leave billable parts behind.
 `go test -tags integration ./internal/s3x/` also runs against a real R2
 bucket — see the header of `internal/s3x/s3x_integration_test.go`.
 
-Releasing: push a tag (`git tag v1.2.3 && git push origin v1.2.3`). The
-`release` workflow builds the SPA, runs the tests, cross-compiles all
+Releasing: push a tag (`git tag v1.2.3 && git push origin v1.2.3`), or run
+the `release` workflow by hand from GitHub Actions with a version. The workflow builds the SPA, runs the tests, cross-compiles all
 platforms with `scripts/build-release.sh` and publishes the GitHub release.
 
 Design: `docs/superpowers/specs/2026-11-19-ku-storage-v1-design.md`,

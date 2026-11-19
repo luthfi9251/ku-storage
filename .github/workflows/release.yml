@@ -1,14 +1,15 @@
 name: release
 
 # Push a tag like v1.0.0 to build binaries for every platform and publish a
-# GitHub release with them. Can also be started by hand for an existing tag.
+# GitHub release with them. Or start it by hand (Actions → release → Run
+# workflow) with a version: it builds the selected branch and creates the tag.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to release (e.g. v1.0.0)"
+        description: "Version to release, e.g. v1.0.0 (tag is created on the selected branch if missing)"
         required: true
 
 permissions:
@@ -20,9 +21,11 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
+      - name: Check version
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "version must look like v1.2.3, got $TAG" >&2; exit 1 ;; esac
+
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
 
       - uses: actions/setup-node@v4
         with:
@@ -52,5 +55,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "ku-storage $TAG" --generate-notes
+            gh release create "$TAG" dist/* --title "ku-storage $TAG" --generate-notes --target "$GITHUB_SHA"
           fi
